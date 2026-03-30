@@ -19,6 +19,7 @@ let state = {
 
 // ========== 初始化 ==========
 document.addEventListener('DOMContentLoaded', () => {
+    CloudSync.init();
     loadState();
     renderPlantGrid();
     renderAlertsList();
@@ -30,12 +31,31 @@ document.addEventListener('DOMContentLoaded', () => {
     startTimerLoop();
     populatePlantSelects();
     cleanupExpiredAlerts();
+    updateSyncStatusBar();
 
     // 每秒更新运行中的定时器显示
     setInterval(renderRunningTimers, 1000);
     // 每60秒清理过期闹钟
     setInterval(cleanupExpiredAlerts, 60000);
 });
+
+// ========== 更新同步状态栏 ==========
+function updateSyncStatusBar() {
+    const bar = document.getElementById('sync-status-bar');
+    const text = document.getElementById('sync-status-text');
+    if (!bar || !text) return;
+
+    if (CloudSync.token && CloudSync.gistId) {
+        text.textContent = '☁️ 已连接云端（数据自动同步）';
+        text.style.color = 'var(--accent-dark)';
+    } else if (CloudSync.token) {
+        text.textContent = '☁️ 待首次同步';
+        text.style.color = 'var(--accent-yellow)';
+    } else {
+        text.textContent = '☁️ 未连接（去设置中配置云同步）';
+        text.style.color = 'var(--text-muted)';
+    }
+}
 
 // ========== 清理过期闹钟 ==========
 function cleanupExpiredAlerts() {
@@ -52,6 +72,8 @@ function cleanupExpiredAlerts() {
 }
 
 // ========== 状态持久化 ==========
+let syncDebounce = null;
+
 function saveState() {
     try {
         const saveData = {
@@ -61,6 +83,15 @@ function saveState() {
         localStorage.setItem('farm-timer-state', JSON.stringify(saveData));
     } catch (e) {
         console.warn('保存状态失败:', e);
+    }
+
+    // 防抖推送到云端（2秒内只推一次）
+    if (CloudSync.token) {
+        clearTimeout(syncDebounce);
+        syncDebounce = setTimeout(() => {
+            CloudSync.pushAlarms(state.alerts);
+            updateSyncStatusBar();
+        }, 2000);
     }
 }
 

@@ -1,0 +1,18 @@
+name: 农场闹钟检查
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  check-alarms:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GH_TOKEN }}
+      SEND_KEY: ${{ secrets.SEND_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 检查闹钟并发送通知
+        run: python3 .github/workflows/check_alarms.py

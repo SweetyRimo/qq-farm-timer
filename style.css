@@ -1399,4 +1399,136 @@ body {
         background: var(--bg-card);
         color: var(--text-primary);
     }
+    
+    .config-input {
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        border-color: var(--border);
+    }
+}
+
+/* === 云同步样式 === */
+.setting-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 16px 0;
+}
+
+.sync-status {
+    display: inline-block;
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+    padding: 4px 10px;
+    border-radius: 12px;
+    background: rgba(139, 168, 122, 0.15);
+}
+
+.sync-status.connected {
+    color: var(--accent-dark);
+    background: rgba(76, 175, 80, 0.1);
+}
+
+.sync-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.5;
+    margin-top: 4px;
+}
+
+.status-badge {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 8px;
+    background: rgba(139, 168, 122, 0.15);
+    color: var(--text-muted);
+    font-weight: 500;
+    vertical-align: middle;
+}
+
+.status-badge.connected {
+    background: rgba(76, 175, 80, 0.15);
+    color: var(--accent-dark);
+}
+
+.config-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 2px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-family: 'SF Mono', 'Menlo', monospace;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    outline: none;
+    transition: border-color 0.2s;
+    box-sizing: border-box;
+}
+
+.config-input:focus {
+    border-color: var(--accent-green);
+}
+
+.config-input::placeholder {
+    color: var(--text-muted);
+    font-family: inherit;
+}
+
+.config-hint {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+.config-hint a {
+    color: var(--accent-green);
+    text-decoration: none;
+}
+
+.config-hint a:hover {
+    text-decoration: underline;
+}
+
+.sync-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.sync-actions button {
+    width: 100%;
+}
+
+.sync-status-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: var(--bg-primary);
+    border-radius: var(--radius-sm);
+    margin-bottom: 12px;
+    font-size: 13px;
+}
+
+.sync-btn {
+    padding: 6px 14px;
+    border: 2px solid var(--accent-green);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--accent-dark);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.sync-btn:hover {
+    background: var(--accent-green);
+    color: white;
+}
+
+.sync-btn:active {
+    transform: scale(0.95);
 }

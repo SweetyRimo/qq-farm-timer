@@ -218,6 +218,10 @@
         <section id="tab-alerts" class="tab-content">
             <div class="card">
                 <h2>🔔 闹钟列表</h2>
+                <div id="sync-status-bar" class="sync-status-bar">
+                    <span id="sync-status-text">☁️ 未连接云端</span>
+                    <button class="sync-btn" onclick="CloudSync.syncNow()">🔄 同步</button>
+                </div>
                 <div id="alerts-list" class="alerts-list">
                     <p class="empty-text">暂无闹钟，去设置一个吧！</p>
                 </div>
@@ -258,6 +262,39 @@
                 <div class="setting-item">
                     <button class="danger-btn" onclick="clearAllAlerts()">🗑️ 清除所有闹钟</button>
                 </div>
+
+                <!-- 云同步设置 -->
+                <div class="setting-divider"></div>
+                <div class="setting-item">
+                    <label>☁️ 云同步 & 推送</label>
+                    <div id="sync-status" class="sync-status">☁️ 未连接</div>
+                    <p class="sync-desc">连接后可在多设备间同步闹钟，并通过微信接收推送通知（即使关闭浏览器也能收到）</p>
+                </div>
+
+                <div class="setting-item">
+                    <label>GitHub Token <span id="token-status" class="status-badge">未配置</span></label>
+                    <input type="text" id="gh-token-input" class="config-input" placeholder="ghp_xxxxx（需要 gist 权限）">
+                    <p class="config-hint">
+                        <a href="https://github.com/settings/tokens/new?scopes=gist&description=QQFarmTimer" target="_blank" rel="noopener">点此创建 Token →</a>
+                        勾选 gist 权限即可
+                    </p>
+                </div>
+
+                <div class="setting-item">
+                    <label>Server酱 SendKey <span id="sendkey-status" class="status-badge">未配置</span></label>
+                    <input type="text" id="send-key-input" class="config-input" placeholder="SCTxxxxx">
+                    <p class="config-hint">
+                        <a href="https://sct.ftqq.com/" target="_blank" rel="noopener">Server酱 →</a>
+                        用 GitHub 登录后获取 SendKey
+                    </p>
+                </div>
+
+                <div class="setting-item sync-actions">
+                    <button class="primary-btn" onclick="CloudSync.saveConfig()" style="font-size:14px;padding:10px;">💾 保存配置</button>
+                    <button class="secondary-btn" onclick="CloudSync.syncNow()" style="font-size:14px;padding:10px;">🔄 立即同步</button>
+                    <button class="secondary-btn" onclick="CloudSync.testPush()" style="font-size:14px;padding:10px;">📡 测试推送</button>
+                </div>
+
                 <button class="secondary-btn" onclick="toggleSettings()">关闭</button>
             </div>
         </div>
@@ -274,6 +311,7 @@
     </div>
 
     <script src="plants-data.js"></script>
+    <script src="cloud-sync.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
