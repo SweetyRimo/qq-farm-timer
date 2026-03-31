@@ -4,7 +4,7 @@
 
 const CloudSync = {
     GIST_DESCRIPTION: 'QQFarmTimer',
-    ALARMS_FILENAME: 'alarms.json',
+    DATA_FILENAME: 'data.json',
     gistId: null,
     token: '',
     sendKey: '',
@@ -152,8 +152,8 @@ const CloudSync = {
                 description: this.GIST_DESCRIPTION,
                 public: false,
                 files: {
-                    [this.ALARMS_FILENAME]: {
-                        content: '[]'
+                    [this.DATA_FILENAME]: {
+                        content: JSON.stringify({ alerts: [], history: [] })
                     }
                 }
             };
@@ -167,16 +167,20 @@ const CloudSync = {
         }
     },
 
-    // ========== 上传闹钟到云端 ==========
+    // ========== 上传数据到云端 ==========
     async pushAlarms(alarms) {
         if (!this.token) return false;
 
         try {
             const gistId = await this.ensureGist();
+            const payload = {
+                alerts: alarms,
+                history: state.history.slice(-200)
+            };
             const data = {
                 files: {
-                    [this.ALARMS_FILENAME]: {
-                        content: JSON.stringify(alarms, null, 2)
+                    [this.DATA_FILENAME]: {
+                        content: JSON.stringify(payload)
                     }
                 }
             };
@@ -184,13 +188,13 @@ const CloudSync = {
             this.updateUI();
             return true;
         } catch (e) {
-            console.error('上传闹钟失败:', e);
+            console.error('上传数据失败:', e);
             showToast('❌ 云同步失败: ' + e.message);
             return false;
         }
     },
 
-    // ========== 从云端拉取闹钟 ==========
+    // ========== 从云端拉取数据 ==========
     async pullAlarms() {
         if (!this.token) return null;
 
@@ -199,13 +203,20 @@ const CloudSync = {
             const gist = await this.apiCall(`/gists/${gistId}`);
 
             const files = gist.files || {};
-            if (this.ALARMS_FILENAME in files) {
-                const content = files[this.ALARMS_FILENAME].content;
-                return JSON.parse(content);
+            // 兼容旧版 alarms.json 和新版 data.json
+            const dataFile = files[this.DATA_FILENAME] || files['alarms.json'];
+            if (dataFile) {
+                const content = dataFile.content;
+                const parsed = JSON.parse(content);
+                // 新版返回 { alerts, history }，旧版返回纯数组
+                if (Array.isArray(parsed)) {
+                    return { alerts: parsed, history: [] };
+                }
+                return { alerts: parsed.alerts || [], history: parsed.history || [] };
             }
-            return [];
+            return { alerts: [], history: [] };
         } catch (e) {
-            console.error('拉取闹钟失败:', e);
+            console.error('拉取数据失败:', e);
             showToast('❌ 云同步失败: ' + e.message);
             return null;
         }
@@ -251,8 +262,11 @@ const CloudSync = {
         showToast('🔄 正在同步...');
 
         // 先拉取云端数据
-        const cloudAlarms = await this.pullAlarms();
-        if (cloudAlarms === null) return;
+        const cloudData = await this.pullAlarms();
+        if (cloudData === null) return;
+
+        const cloudAlarms = cloudData.alerts || [];
+        const cloudHistory = cloudData.history || [];
 
         // 合并策略：以云端为准，但保留本地运行中的定时器
         const now = new Date();
@@ -265,28 +279,35 @@ const CloudSync = {
 
         // 用云端数据替换本地（仅未过期的）
         const activeCloudAlarms = cloudAlarms.filter(a => {
-            if (a.pushNotified) return false; // 跳过已推送的
+            if (a.pushNotified) return false;
             return new Date(a.endTime) > now;
         });
 
-        // 合并：云端 + 本地运行中的
-        const localActiveIds = new Set(Object.keys(state.timers));
-        const merged = [...activeCloudAlarms];
-        
+        // 合并闹钟：云端 + 本地运行中的
         activeCloudAlarms.forEach(a => {
             if (!state.timers[a.id]) {
                 state.timers[a.id] = a;
             }
         });
+        state.alerts = [...activeCloudAlarms];
 
-        state.alerts = merged;
+        // 合并历史记录：本地 + 云端，按 triggeredAt 去重，取最新200条
+        const existingHistoryIds = new Set(state.history.map(h => h.id));
+        cloudHistory.forEach(h => {
+            if (!existingHistoryIds.has(h.id)) {
+                state.history.push(h);
+                existingHistoryIds.add(h.id);
+            }
+        });
+        state.history = state.history.slice(-200);
 
         saveState();
         renderRunningTimers();
         renderAlertsList();
+        renderHistoryList();
         this.updateUI();
 
-        showToast(`✅ 同步完成！共 ${merged.length} 个闹钟`);
+        showToast(`✅ 同步完成！${state.alerts.length} 个闹钟，${state.history.length} 条历史`);
     },
 
     // ========== 断开连接 ==========

@@ -21,7 +21,8 @@ CST = timezone(timedelta(hours=8))
 GH_TOKEN = os.environ.get("GH_TOKEN", "")
 SEND_KEY = os.environ.get("SEND_KEY", "")
 GIST_DESCRIPTION = "QQFarmTimer"
-ALARMS_FILENAME = "alarms.json"
+DATA_FILENAME = "data.json"
+LEGACY_ALARMS_FILENAME = "alarms.json"
 
 
 def github_api(path, method="GET", data=None):
@@ -103,15 +104,33 @@ def main():
         return
 
     files = gist.get("files", {})
-    if ALARMS_FILENAME not in files:
+    # 兼容新版 data.json 和旧版 alarms.json
+    data_file_name = None
+    raw_content = None
+    if DATA_FILENAME in files:
+        data_file_name = DATA_FILENAME
+        raw_content = files[DATA_FILENAME]["content"]
+    elif LEGACY_ALARMS_FILENAME in files:
+        data_file_name = LEGACY_ALARMS_FILENAME
+        raw_content = files[LEGACY_ALARMS_FILENAME]["content"]
+
+    if not raw_content:
         print("💤 闹钟文件不存在，跳过")
         return
 
     try:
-        alarms = json.loads(files[ALARMS_FILENAME]["content"])
+        parsed = json.loads(raw_content)
     except json.JSONDecodeError:
         print("❌ 闹钟数据格式错误")
         return
+
+    # 兼容旧版纯数组和新版 { alerts, history } 格式
+    if isinstance(parsed, list):
+        alarms = parsed
+        cloud_history = []
+    else:
+        alarms = parsed.get("alerts", [])
+        cloud_history = parsed.get("history", [])
 
     if not isinstance(alarms, list) or len(alarms) == 0:
         print("💤 闹钟列表为空，跳过")
@@ -147,22 +166,46 @@ def main():
         if end_time < now - timedelta(hours=24):
             expired_ids.append(alarm["id"])
 
-    # 4. 更新 Gist 数据
-    updated = []
+    # 4. 更新 Gist 数据（写入新版 data.json 格式，保留 history）
+    updated_alarms = []
     for alarm in alarms:
         aid = alarm.get("id")
         if aid in expired_ids:
             continue
         if aid in notified_ids:
             alarm["pushNotified"] = True
-        updated.append(alarm)
+        updated_alarms.append(alarm)
+
+    # 将已推送的闹钟写入历史记录
+    for alarm in updated_alarms:
+        if alarm.get("pushNotified") and alarm.get("id") in notified_ids:
+            history_entry = {
+                "id": alarm["id"],
+                "label": alarm.get("label", "定时器"),
+                "plant": alarm.get("plant", ""),
+                "endTime": alarm.get("endTime", ""),
+                "totalSeconds": alarm.get("totalSeconds", 0),
+                "triggeredAt": now.isoformat(),
+            }
+            cloud_history.append(history_entry)
+
+    # 历史最多保留200条
+    cloud_history = cloud_history[-200:]
 
     if notified_ids or expired_ids:
+        payload = {
+            "alerts": updated_alarms,
+            "history": cloud_history,
+        }
         update_data = {
             "files": {
-                ALARMS_FILENAME: {"content": json.dumps(updated, ensure_ascii=False, indent=2)}
+                DATA_FILENAME: {"content": json.dumps(payload, ensure_ascii=False)}
             }
         }
+        # 如果是旧版格式，同时删除旧文件
+        if data_file_name == LEGACY_ALARMS_FILENAME:
+            update_data["files"][LEGACY_ALARMS_FILENAME] = None
+
         result = github_api(f"/gists/{gist_id}", method="PATCH", data=update_data)
         if result:
             print(f"✅ 已更新 Gist（推送 {len(notified_ids)} 个，清理 {len(expired_ids)} 个）")
