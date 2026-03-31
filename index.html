@@ -23,7 +23,8 @@
             <button class="tab-btn active" data-tab="timer" onclick="switchTab('timer')">⏰ 定时</button>
             <button class="tab-btn" data-tab="plant" onclick="switchTab('plant')">🌱 种植</button>
             <button class="tab-btn" data-tab="sleep" onclick="switchTab('sleep')">😴 睡前方案</button>
-            <button class="tab-btn" data-tab="alerts" onclick="switchTab('alerts')">🔔 闹钟列表</button>
+            <button class="tab-btn" data-tab="alerts" onclick="switchTab('alerts')">🔔 闹钟</button>
+            <button class="tab-btn" data-tab="history" onclick="switchTab('history')">📋 历史</button>
         </nav>
 
         <!-- 背景装饰粒子 -->
@@ -224,6 +225,23 @@
                 </div>
                 <div id="alerts-list" class="alerts-list">
                     <p class="empty-text">暂无闹钟，去设置一个吧！</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 历史记录页面 -->
+        <section id="tab-history" class="tab-content">
+            <div class="card">
+                <div class="history-header">
+                    <h2>📋 闹钟历史</h2>
+                    <span id="history-count" class="history-count">0条</span>
+                </div>
+                <p class="hint-text">已触发的闹钟记录，最新排最前</p>
+                <div id="history-list" class="history-list">
+                    <p class="empty-text">暂无历史记录</p>
+                </div>
+                <div id="history-clear-wrap" class="history-clear-wrap" style="display:none;">
+                    <button class="danger-btn" onclick="clearHistory()">🗑️ 清空历史记录</button>
                 </div>
             </div>
         </section>

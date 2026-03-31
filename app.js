@@ -6,6 +6,7 @@
 let state = {
     timers: {},           // 运行中的定时器 { id: { ... } }
     alerts: [],           // 闹钟列表
+    history: [],          // 已触发的闹钟历史记录
     settings: {
         volume: 70,
         notifySound: true,
@@ -23,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadState();
     renderPlantGrid();
     renderAlertsList();
+    renderHistoryList();
     renderRunningTimers();
     initVoice();
     initPasteHandler();
@@ -78,6 +80,7 @@ function saveState() {
     try {
         const saveData = {
             alerts: state.alerts.map(a => ({ ...a })),
+            history: state.history.slice(-200), // 最多保留200条
             settings: state.settings
         };
         localStorage.setItem('farm-timer-state', JSON.stringify(saveData));
@@ -100,6 +103,7 @@ function loadState() {
         const data = JSON.parse(localStorage.getItem('farm-timer-state'));
         if (data) {
             state.alerts = data.alerts || [];
+            state.history = data.history || [];
             state.settings = { ...state.settings, ...data.settings };
             
             // 恢复未过期的闹钟为定时器
@@ -484,6 +488,18 @@ function triggerAlarm(timer) {
     const message = timer.plant 
         ? `${PLANTS_DATABASE[timer.plant]?.emoji || '🌱'} ${timer.plant || '植物'}成熟了！快去收菜！` 
         : `⏰ 定时结束！${timer.label}`;
+    
+    // 写入历史记录
+    state.history.push({
+        id: timer.id,
+        label: timer.label,
+        plant: timer.plant,
+        endTime: timer.endTime,
+        totalSeconds: timer.totalSeconds,
+        triggeredAt: new Date().toISOString()
+    });
+    saveState();
+    renderHistoryList();
     
     // 显示弹窗
     document.getElementById('alarm-message').textContent = message;
@@ -1110,6 +1126,95 @@ function clearAllAlerts() {
     renderRunningTimers();
     renderAlertsList();
     showToast('已清除所有闹钟');
+}
+
+// ========== 历史记录 ==========
+function renderHistoryList() {
+    const list = document.getElementById('history-list');
+    const countEl = document.getElementById('history-count');
+    const clearWrap = document.getElementById('history-clear-wrap');
+    if (!list) return;
+
+    // 按触发时间倒序
+    const sorted = [...state.history].reverse();
+
+    if (countEl) countEl.textContent = `${sorted.length}条`;
+    if (clearWrap) clearWrap.style.display = sorted.length > 0 ? 'block' : 'none';
+
+    if (sorted.length === 0) {
+        list.innerHTML = '<p class="empty-text">暂无历史记录</p>';
+        return;
+    }
+
+    // 按日期分组
+    const groups = {};
+    sorted.forEach(item => {
+        const triggered = new Date(item.triggeredAt);
+        const dateKey = triggered.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'short' });
+        if (!groups[dateKey]) groups[dateKey] = [];
+        groups[dateKey].push(item);
+    });
+
+    let html = '';
+    Object.entries(groups).forEach(([dateLabel, items]) => {
+        html += `<div class="history-date-label">${dateLabel}</div>`;
+        items.forEach(item => {
+            const triggered = new Date(item.triggeredAt);
+            const timeStr = triggered.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+            const plant = item.plant ? PLANTS_DATABASE[item.plant] : null;
+            const emoji = plant?.emoji || '⏰';
+            const duration = formatDuration(item.totalSeconds);
+
+            html += `
+                <div class="history-item" onclick="restartFromHistory('${item.id}')">
+                    <div class="history-icon">${emoji}</div>
+                    <div class="history-info">
+                        <div class="history-label">${item.label}</div>
+                        <div class="history-meta">
+                            <span>⏱️ ${duration}</span>
+                            <span>🔔 ${timeStr} 触发</span>
+                        </div>
+                    </div>
+                    <div class="history-restart" title="重新设置">🔄</div>
+                </div>
+            `;
+        });
+    });
+
+    list.innerHTML = html;
+}
+
+function formatDuration(seconds) {
+    if (!seconds) return '';
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    if (h > 0 && m > 0) return `${h}时${m}分`;
+    if (h > 0) return `${h}小时`;
+    if (m > 0 && s > 0) return `${m}分${s}秒`;
+    if (m > 0) return `${m}分钟`;
+    if (s > 0) return `${s}秒`;
+    return '';
+}
+
+function restartFromHistory(id) {
+    const item = state.history.find(h => h.id === id);
+    if (!item) return;
+
+    if (item.plant && PLANTS_DATABASE[item.plant]) {
+        startPlantTimer(item.plant);
+    } else if (item.totalSeconds) {
+        setQuickTime(item.totalSeconds);
+        showToast('⏰ 已填充上次的时间，点击开始计时');
+    }
+}
+
+function clearHistory() {
+    if (!confirm('确定要清空所有历史记录吗？')) return;
+    state.history = [];
+    saveState();
+    renderHistoryList();
+    showToast('已清空历史记录');
 }
 
 // ========== 设置 ==========

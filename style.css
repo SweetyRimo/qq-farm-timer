@@ -1058,6 +1058,115 @@ body {
     color: white;
 }
 
+/* === 历史记录 === */
+.history-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.history-header h2 {
+    margin: 0;
+}
+
+.history-count {
+    font-size: 12px;
+    color: var(--text-muted);
+    background: var(--bg-primary);
+    padding: 3px 10px;
+    border-radius: 10px;
+}
+
+.history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.history-date-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    padding: 10px 4px 4px;
+    border-bottom: 1px solid var(--border);
+    margin-top: 6px;
+}
+
+.history-date-label:first-child {
+    margin-top: 0;
+}
+
+.history-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--bg-primary);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.history-item:hover {
+    background: var(--bg-secondary);
+    box-shadow: 0 2px 8px var(--shadow);
+    transform: translateY(-1px);
+}
+
+.history-item:active {
+    transform: scale(0.98);
+}
+
+.history-icon {
+    font-size: 22px;
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(76, 175, 80, 0.08);
+    border-radius: 10px;
+}
+
+.history-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.history-label {
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.history-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+    display: flex;
+    gap: 12px;
+    margin-top: 2px;
+}
+
+.history-restart {
+    font-size: 18px;
+    flex-shrink: 0;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.history-item:hover .history-restart {
+    opacity: 1;
+}
+
+.history-clear-wrap {
+    margin-top: 16px;
+    text-align: center;
+}
+
 /* === 设置弹窗 === */
 .modal-overlay {
     position: fixed;
