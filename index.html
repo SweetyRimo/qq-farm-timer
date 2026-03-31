@@ -107,6 +107,19 @@
         <section id="tab-plant" class="tab-content">
             <div class="card">
                 <h2>🌱 选择植物品种</h2>
+                <!-- 土地类型选择器 -->
+                <div class="land-selector">
+                    <span class="land-label">土地类型：</span>
+                    <div class="land-options" id="land-options">
+                        <button class="land-btn active" data-land="normal" onclick="selectLand('normal')">🟫 普通</button>
+                        <button class="land-btn" data-land="red" onclick="selectLand('red')">🔴 红土</button>
+                        <button class="land-btn" data-land="black" onclick="selectLand('black')">⬛ 黑土</button>
+                        <button class="land-btn" data-land="gold" onclick="selectLand('gold')">🟡 金土</button>
+                    </div>
+                </div>
+                <div class="land-info" id="land-info">
+                    <span class="land-bonus" id="land-bonus-text">增产+0% · 成熟时间无缩短</span>
+                </div>
                 <div class="plant-search">
                     <input type="text" id="plant-search-input" placeholder="🔍 搜索植物名称..." oninput="filterPlants(this.value)">
                 </div>

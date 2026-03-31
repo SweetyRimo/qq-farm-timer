@@ -454,6 +454,65 @@ body {
     margin-bottom: 12px;
 }
 
+/* === 土地类型选择器 === */
+.land-selector {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.land-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.land-options {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.land-btn {
+    padding: 6px 12px;
+    border: 2px solid var(--border);
+    border-radius: 20px;
+    background: white;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 500;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.land-btn:hover {
+    border-color: var(--accent-green);
+    background: rgba(76, 175, 80, 0.06);
+}
+
+.land-btn.active {
+    border-color: var(--accent-green);
+    background: rgba(76, 175, 80, 0.15);
+    color: var(--accent-dark);
+    font-weight: 600;
+}
+
+.land-info {
+    margin-bottom: 12px;
+}
+
+.land-bonus {
+    font-size: 12px;
+    color: var(--text-muted);
+    display: inline-block;
+    padding: 4px 10px;
+    background: var(--bg-primary);
+    border-radius: 10px;
+}
+
 .plant-search input {
     width: 100%;
     padding: 10px 16px;
@@ -534,6 +593,18 @@ body {
 
 .plant-profit .coin { color: var(--accent-orange); }
 .plant-profit .exp { color: var(--accent-yellow); }
+
+/* === 植物卡片季次标签 === */
+.plant-seasons {
+    display: block;
+    font-size: 10px;
+    color: var(--accent-dark);
+    font-weight: 500;
+    background: rgba(76, 175, 80, 0.1);
+    padding: 1px 6px;
+    border-radius: 6px;
+    margin-top: 2px;
+}
 
 /* === 自定义种植 === */
 .custom-plant-form {
@@ -1450,6 +1521,16 @@ body {
     text-align: center;
 }
 
+.confirm-body span {
+    display: inline-block;
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--accent-dark);
+    background: rgba(76, 175, 80, 0.08);
+    padding: 2px 8px;
+    border-radius: 6px;
+}
+
 .confirm-body strong {
     color: var(--text-primary);
 }
@@ -1458,6 +1539,46 @@ body {
     display: block;
     margin-top: 6px;
     color: var(--text-muted);
+}
+
+/* === 种植确认弹窗 - 多季详情 === */
+.seasons-detail {
+    margin-top: 12px;
+    padding: 10px;
+    background: var(--bg-primary);
+    border-radius: var(--radius-sm);
+    text-align: left;
+}
+
+.seasons-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    text-align: center;
+}
+
+.season-row {
+    font-size: 13px;
+    color: var(--text-secondary);
+    padding: 3px 0;
+    padding-left: 8px;
+    border-left: 3px solid var(--accent-light);
+    margin-bottom: 3px;
+}
+
+.season-row strong {
+    color: var(--accent-dark);
+}
+
+.seasons-total {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    text-align: center;
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px dashed var(--border);
 }
 
 .confirm-actions {

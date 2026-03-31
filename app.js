@@ -15,7 +15,8 @@ let state = {
         alarmSound: 'classic'
     },
     voiceActive: false,
-    recognition: null
+    recognition: null,
+    selectedLand: 'normal'  // 当前选择的土地类型
 };
 
 // ========== 初始化 ==========
@@ -385,25 +386,54 @@ function startPlantTimer(plantName) {
         return;
     }
     
+    const landType = state.selectedLand;
+    const land = LAND_TYPES[landType];
+    const growTime = calcGrowTime(plantName, landType); // 首季成熟时间
+    const totalTime = calcTotalGrowTime(plantName, landType); // 总成熟时间
+    const seasonTimes = getSeasonTimes(plantName, landType);
+    
     // 显示确认弹窗
-    const endStr = new Date(Date.now() + plant.growthTime * 3600 * 1000)
-        .toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    const endTime = new Date(Date.now() + growTime * 3600 * 1000);
+    const endStr = endTime.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    
+    // 构建各季成熟时间信息
+    let seasonsInfo = '';
+    if (plant.seasons > 1) {
+        const seasonList = seasonTimes.map((t, i) => 
+            `<div class="season-row">第${i + 1}季: <strong>${t}小时</strong></div>`
+        ).join('');
+        seasonsInfo = `
+            <div class="seasons-detail">
+                <div class="seasons-title">📅 各季成熟时间（${land.emoji} ${land.name}）</div>
+                ${seasonList}
+                <div class="seasons-total">全部收获预计 <strong>${totalTime}小时</strong></div>
+            </div>
+        `;
+    }
+    
+    const yieldBonus = land.yieldBonus > 0 ? `<span>📈 ${land.emoji}增产+${Math.round(land.yieldBonus * 100)}%</span>` : '';
+    const timeBonus = land.timeBonus > 0 ? `<span>⏱️ 成熟-${Math.round(land.timeBonus * 100)}%</span>` : '';
     
     showConfirm(
         `${plant.emoji} 种植确认`,
-        `确定要种下 <strong>${plant.name}</strong> 吗？<br>成熟时间：<strong>${plant.growthTime}小时</strong><br>预计收获：<strong>${endStr}</strong><br><small>💰 收入 ${plant.sellPrice} · ⭐ 经验 +${plant.exp}</small>`,
+        `确定要在 <strong>${land.emoji} ${land.name}</strong> 上种下 <strong>${plant.name}</strong> 吗？<br>
+        首季成熟：<strong>${growTime}小时</strong>（预计 <strong>${endStr}</strong>）<br>
+        <small>💰 收入 ${plant.sellPrice} · ⭐ 经验 +${plant.exp} · ${plant.seasons}季作物</small>
+        ${yieldBonus}${timeBonus}
+        ${seasonsInfo}`,
         () => {
-            const totalSeconds = plant.growthTime * 3600;
+            const totalSeconds = Math.round(growTime * 3600);
             const id = 'timer_' + Date.now();
-            const endTime = new Date(Date.now() + totalSeconds * 1000);
+            const endTimeISO = new Date(Date.now() + totalSeconds * 1000);
             
             const timer = {
                 id,
-                endTime: endTime.toISOString(),
+                endTime: endTimeISO.toISOString(),
                 totalSeconds,
                 remainingSeconds: totalSeconds,
-                label: `${plant.emoji} ${plant.name}`,
+                label: `${plant.emoji} ${plant.name} (${land.emoji}${growTime}h)`,
                 plant: plantName,
+                land: landType,
                 createdAt: new Date().toISOString()
             };
             
@@ -413,7 +443,7 @@ function startPlantTimer(plantName) {
             renderRunningTimers();
             renderAlertsList();
             
-            showToast(`🌱 ${plant.name}已种下！${plant.growthTime}小时后（${endStr}）提醒收菜`);
+            showToast(`🌱 ${plant.name}已种在${land.emoji}${land.name}！${growTime}小时后（${endStr}）提醒收菜`);
         }
     );
 }
@@ -611,26 +641,59 @@ function stopAlarmSound() {
     }
 }
 
+// ========== 土地类型选择 ==========
+function selectLand(landType) {
+    state.selectedLand = landType;
+    const land = LAND_TYPES[landType];
+    
+    // 更新按钮状态
+    document.querySelectorAll('.land-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.land === landType);
+    });
+    
+    // 更新加成信息
+    const bonusText = document.getElementById('land-bonus-text');
+    if (land.timeBonus > 0) {
+        bonusText.textContent = `增产+${Math.round(land.yieldBonus * 100)}% · 成熟时间-${Math.round(land.timeBonus * 100)}%`;
+    } else if (land.yieldBonus > 0) {
+        bonusText.textContent = `增产+${Math.round(land.yieldBonus * 100)}% · 成熟时间无缩短`;
+    } else {
+        bonusText.textContent = '增产+0% · 成熟时间无缩短';
+    }
+    
+    // 重新渲染植物列表
+    renderPlantGrid(document.getElementById('plant-search-input').value);
+}
+
 // ========== 植物网格 ==========
 function renderPlantGrid(filter = '') {
     const grid = document.getElementById('plant-grid');
-    const plants = filter ? searchPlants(filter) : Object.values(PLANTS_DATABASE);
+    const landType = state.selectedLand;
+    const plants = filter ? searchPlants(filter, landType) : Object.values(PLANTS_DATABASE).filter(p => canPlantOnLand(p, landType));
     
     // 按级别排序
     plants.sort((a, b) => a.level - b.level);
     
-    grid.innerHTML = plants.map(plant => `
+    grid.innerHTML = plants.map(plant => {
+        const growTime = calcGrowTime(plant.name, landType);
+        const totalTime = calcTotalGrowTime(plant.name, landType);
+        const seasonsInfo = plant.seasons > 1 
+            ? `<span class="plant-seasons">${plant.seasons}季 · 总${totalTime}h</span>` 
+            : '';
+        
+        return `
         <div class="plant-card" onclick="startPlantTimer('${plant.name}')">
             <div class="plant-emoji">${plant.emoji}</div>
             <div class="plant-name">${plant.name}</div>
-            <div class="plant-time">${plant.growthTime}小时</div>
+            <div class="plant-time">${growTime}小时${plant.seasons > 1 ? ' (首季)' : ''}</div>
+            ${seasonsInfo}
             <div class="plant-level">Lv.${plant.level}</div>
             <div class="plant-profit">
                 <span class="coin">💰${plant.sellPrice}</span>
                 <span class="exp">⭐${plant.exp}</span>
             </div>
         </div>
-    `).join('');
+    `}).join('');
 }
 
 function filterPlants(keyword) {
