@@ -400,6 +400,12 @@ const CloudSync = {
     async syncNow() {
         if (!this.token) {
             showToast('❌ 请先配置 GitHub Token');
+            if (typeof openSettingsPanel === 'function') {
+                openSettingsPanel({
+                    targetId: 'token-setting-item',
+                    focusId: 'gh-token-input'
+                });
+            }
             return;
         }
 

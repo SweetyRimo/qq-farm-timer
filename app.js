@@ -16,7 +16,7 @@ let state = {
     },
     voiceActive: false,
     recognition: null,
-    selectedLand: 'normal'  // 当前选择的土地类型
+    selectedLand: 'gold'  // 当前选择的土地类型，默认金土
 };
 
 // ========== 初始化 ==========
@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderCustomPlantsList();
     initSeasonHint();
     initPWA();
-    selectLand(state.selectedLand || 'normal');
+    selectLand(state.selectedLand || 'gold');
 
     // 每秒更新运行中的定时器显示
     setInterval(renderRunningTimers, 1000);
@@ -71,16 +71,54 @@ function sortHistoryItems(items = []) {
     });
 }
 
+function inferLandTypeFromRecord(record) {
+    if (!record) return null;
+
+    if (record.land && LAND_TYPES[record.land]) {
+        return record.land;
+    }
+
+    const label = typeof record.label === 'string' ? record.label : '';
+    const matchedByLabel = Object.entries(LAND_TYPES).find(([, land]) =>
+        label.includes(land.emoji) || label.includes(land.name)
+    );
+    if (matchedByLabel) {
+        return matchedByLabel[0];
+    }
+
+    if (record.plant && Number(record.totalSeconds) > 0 && PLANTS_DATABASE[record.plant]) {
+        const matchedByDuration = Object.keys(LAND_TYPES).filter(landType => {
+            const expectedSeconds = Math.round(calcGrowTime(record.plant, landType) * 3600);
+            return Math.abs(expectedSeconds - Number(record.totalSeconds)) <= 60;
+        });
+
+        if (matchedByDuration.length === 1) {
+            return matchedByDuration[0];
+        }
+    }
+
+    return null;
+}
+
+function normalizeAlertRecord(record) {
+    if (!record || typeof record !== 'object') return record;
+
+    const inferredLand = inferLandTypeFromRecord(record);
+    return inferredLand ? { ...record, land: inferredLand } : { ...record };
+}
+
 function archiveAlertToHistory(alert, triggeredAt = null) {
     if (!alert?.id) return false;
 
+    const inferredLand = inferLandTypeFromRecord(alert);
     const historyItem = {
         id: alert.id,
         label: alert.label,
         plant: alert.plant,
         endTime: alert.endTime,
         totalSeconds: alert.totalSeconds,
-        triggeredAt: triggeredAt || alert.triggeredAt || alert.endTime || new Date().toISOString()
+        triggeredAt: triggeredAt || alert.triggeredAt || alert.endTime || new Date().toISOString(),
+        ...(inferredLand ? { land: inferredLand } : {})
     };
 
     const existingIndex = state.history.findIndex(item => item.id === historyItem.id);
@@ -154,8 +192,8 @@ function loadState() {
     try {
         const data = JSON.parse(localStorage.getItem('farm-timer-state'));
         if (data) {
-            state.alerts = Array.isArray(data.alerts) ? data.alerts : [];
-            state.history = Array.isArray(data.history) ? data.history : [];
+            state.alerts = Array.isArray(data.alerts) ? data.alerts.map(normalizeAlertRecord) : [];
+            state.history = Array.isArray(data.history) ? data.history.map(normalizeAlertRecord) : [];
             state.history = sortHistoryItems(state.history).slice(-200);
             state.settings = { ...state.settings, ...data.settings };
 
@@ -618,14 +656,16 @@ function startTimer() {
     setQuickTime(0);
 }
 
-function startPlantTimer(plantName) {
+function startPlantTimer(plantName, preferredLandType = null) {
     const plant = PLANTS_DATABASE[plantName];
     if (!plant) {
         showToast('未找到该植物信息');
         return;
     }
     
-    const landType = state.selectedLand;
+    const landType = preferredLandType && LAND_TYPES[preferredLandType]
+        ? preferredLandType
+        : (state.selectedLand || 'normal');
     const land = LAND_TYPES[landType];
     const growTime = calcGrowTime(plantName, landType); // 首季成熟时间
     const totalTime = calcTotalGrowTime(plantName, landType); // 总成熟时间
@@ -1492,8 +1532,13 @@ function restartFromHistory(id) {
     const item = state.history.find(h => h.id === id);
     if (!item) return;
 
+    const landType = inferLandTypeFromRecord(item);
+
     if (item.plant && PLANTS_DATABASE[item.plant]) {
-        startPlantTimer(item.plant);
+        if (landType && landType !== state.selectedLand) {
+            selectLand(landType);
+        }
+        startPlantTimer(item.plant, landType);
     } else if (item.totalSeconds) {
         setQuickTime(item.totalSeconds);
         showToast('⏰ 已填充上次的时间，点击开始计时');
@@ -1512,6 +1557,36 @@ function clearHistory() {
 function toggleSettings() {
     const modal = document.getElementById('settings-modal');
     modal.style.display = modal.style.display === 'none' ? 'flex' : 'none';
+}
+
+function openSettingsPanel(options = {}) {
+    const modal = document.getElementById('settings-modal');
+    if (!modal) return;
+
+    const { targetId = '', focusId = '' } = options;
+    modal.style.display = 'flex';
+
+    if (!targetId && !focusId) return;
+
+    requestAnimationFrame(() => {
+        const target = document.getElementById(targetId || focusId);
+        const focusTarget = document.getElementById(focusId) || target;
+
+        if (target) {
+            target.classList.remove('anchor-highlight');
+            void target.offsetWidth;
+            target.classList.add('anchor-highlight');
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setTimeout(() => target.classList.remove('anchor-highlight'), 2400);
+        }
+
+        if (focusTarget && typeof focusTarget.focus === 'function') {
+            focusTarget.focus({ preventScroll: true });
+            if (typeof focusTarget.select === 'function') {
+                focusTarget.select();
+            }
+        }
+    });
 }
 
 function refreshSettingsForm() {
