@@ -1854,9 +1854,26 @@ function showNotificationGuideModal(options = {}) {
 // ========== PWA ==========
 let deferredInstallPrompt = null;
 let pwaInstallReady = false;
+const PWA_SESSION_FLAG = 'farm-pwa-session';
+
+function syncPwaSessionFlag() {
+    const launchedFromPwa = new URLSearchParams(window.location.search).get('source') === 'pwa';
+    const launchedFromAndroidApp = document.referrer.startsWith('android-app://');
+    const displayModes = ['standalone', 'fullscreen', 'minimal-ui', 'window-controls-overlay'];
+    const matchedDisplayMode = displayModes.some(mode => window.matchMedia?.(`(display-mode: ${mode})`).matches);
+    const iosStandalone = window.navigator.standalone === true;
+
+    const isInstalledContext = launchedFromPwa || launchedFromAndroidApp || matchedDisplayMode || iosStandalone;
+    if (isInstalledContext) {
+        sessionStorage.setItem(PWA_SESSION_FLAG, '1');
+    }
+
+    return isInstalledContext || sessionStorage.getItem(PWA_SESSION_FLAG) === '1';
+}
 
 function initPWA() {
     registerServiceWorker();
+    syncPwaSessionFlag();
     updatePwaInstallUI();
 
     window.addEventListener('beforeinstallprompt', (event) => {
@@ -1870,6 +1887,7 @@ function initPWA() {
     window.addEventListener('appinstalled', () => {
         deferredInstallPrompt = null;
         pwaInstallReady = false;
+        sessionStorage.setItem(PWA_SESSION_FLAG, '1');
         clearNotifyGuideDismissal();
         updatePwaInstallUI(true);
         showToast('✅ 已安装到桌面，可像 App 一样快速打开');
@@ -1879,10 +1897,21 @@ function initPWA() {
     const displayModeMedia = window.matchMedia?.('(display-mode: standalone)');
     if (displayModeMedia?.addEventListener) {
         displayModeMedia.addEventListener('change', () => {
+            syncPwaSessionFlag();
             updatePwaInstallUI();
             maybeShowNotificationGuide({ delay: 350 });
         });
     }
+
+    window.addEventListener('pageshow', () => {
+        syncPwaSessionFlag();
+        updatePwaInstallUI();
+    });
+
+    window.addEventListener('focus', () => {
+        syncPwaSessionFlag();
+        updatePwaInstallUI();
+    });
 
     maybeShowNotificationGuide({ delay: 900 });
 }
@@ -1900,7 +1929,7 @@ function registerServiceWorker() {
 }
 
 function isPwaInstalled() {
-    return window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    return syncPwaSessionFlag();
 }
 
 function updatePwaInstallUI(forceInstalled = false) {
