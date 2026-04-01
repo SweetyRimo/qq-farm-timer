@@ -302,6 +302,19 @@
                     </p>
                 </div>
 
+                <div class="setting-item config-transfer-entry">
+                    <div class="setting-row">
+                        <label>🧳 配置迁移</label>
+                        <span class="status-badge">本地文件</span>
+                    </div>
+                    <p class="config-hint config-transfer-hint">Token / SendKey 不会默认云同步。需要迁移到安装版或新设备时，请手动导出后再导入。</p>
+                    <div class="sync-actions config-transfer-actions">
+                        <button class="secondary-btn" onclick="CloudSync.exportConfig()" style="font-size:14px;padding:10px;">⬇️ 导出本地配置</button>
+                        <button class="secondary-btn" onclick="CloudSync.openImportConfig()" style="font-size:14px;padding:10px;">⬆️ 导入本地配置</button>
+                    </div>
+                    <input type="file" id="config-import-input" accept="application/json,.json" hidden onchange="CloudSync.importConfigFromFile(event)">
+                </div>
+
                 <div class="setting-item sync-actions">
                     <button class="primary-btn" onclick="CloudSync.saveConfig()" style="font-size:14px;padding:10px;">💾 保存配置</button>
                     <button class="secondary-btn" onclick="CloudSync.syncNow()" style="font-size:14px;padding:10px;">🔄 立即同步</button>

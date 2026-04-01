@@ -35,9 +35,12 @@ const CloudSync = {
                 tokenStatus.textContent = '✅ 已配置';
                 tokenStatus.className = 'status-badge connected';
             }
-        } else if (tokenStatus) {
-            tokenStatus.textContent = '未配置';
-            tokenStatus.className = 'status-badge';
+        } else {
+            if (tokenInput) tokenInput.value = '';
+            if (tokenStatus) {
+                tokenStatus.textContent = '未配置';
+                tokenStatus.className = 'status-badge';
+            }
         }
         if (sendKeyInput && this.sendKey) {
             sendKeyInput.value = this.sendKey;
@@ -45,9 +48,12 @@ const CloudSync = {
                 sendkeyStatus.textContent = '✅ 已配置';
                 sendkeyStatus.className = 'status-badge connected';
             }
-        } else if (sendkeyStatus) {
-            sendkeyStatus.textContent = '未配置';
-            sendkeyStatus.className = 'status-badge';
+        } else {
+            if (sendKeyInput) sendKeyInput.value = '';
+            if (sendkeyStatus) {
+                sendkeyStatus.textContent = '未配置';
+                sendkeyStatus.className = 'status-badge';
+            }
         }
         if (statusEl) {
             if (this.token && this.gistId) {
@@ -100,6 +106,126 @@ const CloudSync = {
 
         this.updateUI();
         showToast(changed ? '✅ 配置已保存' : '✅ 配置无变化，已确认');
+    },
+
+    // ========== 配置导出 / 导入 ==========
+    exportConfig() {
+        const payload = {
+            app: 'QQFarmTimer',
+            version: 1,
+            exportedAt: new Date().toISOString(),
+            note: '包含敏感配置，仅供本地迁移使用，请勿上传或分享。',
+            sync: {
+                token: this.token || '',
+                gistId: this.gistId || '',
+                sendKey: this.sendKey || ''
+            },
+            settings: {
+                ...state.settings
+            }
+        };
+
+        const blob = new Blob([
+            JSON.stringify(payload, null, 2)
+        ], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        const date = new Date().toISOString().slice(0, 10);
+        link.href = url;
+        link.download = `qq-farm-timer-config-${date}.json`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        showToast('✅ 已导出本地配置，请妥善保管该文件');
+    },
+
+    openImportConfig() {
+        const input = document.getElementById('config-import-input');
+        if (!input) {
+            showToast('❌ 当前页面缺少导入入口');
+            return;
+        }
+        input.value = '';
+        input.click();
+    },
+
+    async importConfigFromFile(event) {
+        const file = event?.target?.files?.[0];
+        if (!file) return;
+
+        try {
+            const text = await file.text();
+            const parsed = JSON.parse(text);
+            const sync = parsed?.sync || {};
+            const settings = parsed?.settings || {};
+            const hasToken = typeof sync.token === 'string' && sync.token.trim().length > 0;
+            const hasSendKey = typeof sync.sendKey === 'string' && sync.sendKey.trim().length > 0;
+            const settingCount = Object.keys(settings).filter(key => settings[key] !== undefined).length;
+
+            if ((!parsed || typeof parsed !== 'object') || (!settingCount && !hasToken && !hasSendKey && !sync.gistId)) {
+                throw new Error('文件中没有可导入的配置');
+            }
+
+            const summary = [
+                '将覆盖当前设备上的本地配置。',
+                `<br><span>提醒设置：${settingCount || 0}项</span>`,
+                `<br><span>GitHub Token：${hasToken ? '包含' : '不包含'}</span>`,
+                `<br><span>Server酱 SendKey：${hasSendKey ? '包含' : '不包含'}</span>`
+            ].join('');
+
+            showConfirm('导入本地配置', summary, () => this.applyImportedConfig(parsed));
+        } catch (error) {
+            showToast(`❌ 导入失败：${error.message || '文件格式不正确'}`);
+        }
+    },
+
+    applyImportedConfig(parsed) {
+        const sync = parsed?.sync || {};
+        const nextSettings = parsed?.settings || {};
+        const normalize = value => typeof value === 'string' ? value.trim() : '';
+
+        this.token = normalize(sync.token);
+        this.gistId = normalize(sync.gistId);
+        this.sendKey = normalize(sync.sendKey);
+
+        if (this.token) {
+            localStorage.setItem('farm-gh-token', this.token);
+        } else {
+            localStorage.removeItem('farm-gh-token');
+        }
+
+        if (this.gistId) {
+            localStorage.setItem('farm-gist-id', this.gistId);
+        } else {
+            localStorage.removeItem('farm-gist-id');
+        }
+
+        if (this.sendKey) {
+            localStorage.setItem('farm-send-key', this.sendKey);
+        } else {
+            localStorage.removeItem('farm-send-key');
+        }
+
+        state.settings = {
+            ...state.settings,
+            ...nextSettings
+        };
+
+        localStorage.setItem('farm-timer-state', JSON.stringify({
+            alerts: state.alerts.map(a => ({ ...a })),
+            history: state.history.slice(-200),
+            settings: state.settings
+        }));
+
+        if (typeof refreshSettingsForm === 'function') {
+            refreshSettingsForm();
+        }
+        this.updateUI();
+        if (typeof updateSyncStatusBar === 'function') {
+            updateSyncStatusBar();
+        }
+        showToast('✅ 本地配置已导入；敏感信息仍只保存在当前设备');
     },
 
     // ========== GitHub API 请求 ==========
@@ -367,19 +493,9 @@ const CloudSync = {
             // 合并设置：以云端的为准（如果云端有的话）
             if (cloudSettings) {
                 state.settings = { ...state.settings, ...cloudSettings };
-                // 更新设置UI
-                setTimeout(() => {
-                    const vol = document.getElementById('volume-slider');
-                    const sound = document.getElementById('notify-sound');
-                    const vib = document.getElementById('notify-vibrate');
-                    const push = document.getElementById('notify-push');
-                    const alarmSel = document.getElementById('alarm-sound-select');
-                    if (vol) vol.value = state.settings.volume;
-                    if (sound) sound.checked = state.settings.notifySound;
-                    if (vib) vib.checked = state.settings.notifyVibrate;
-                    if (push) push.checked = state.settings.notifyPush;
-                    if (alarmSel) alarmSel.value = state.settings.alarmSound;
-                }, 100);
+                if (typeof refreshSettingsForm === 'function') {
+                    refreshSettingsForm();
+                }
             }
 
             // 推送本地数据到云端（包含合并后的结果）

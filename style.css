@@ -1756,6 +1756,74 @@ body {
     100% { transform: translateY(-10vh) rotate(360deg); opacity: 0; }
 }
 
+/* === 通知引导弹窗 === */
+.notify-guide-dialog {
+    background: white;
+    border-radius: 24px;
+    padding: 24px;
+    width: 100%;
+    max-width: 340px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.22);
+    animation: fadeIn 0.2s ease;
+}
+
+.notify-guide-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 14px;
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.16), rgba(255, 193, 7, 0.18));
+    font-size: 28px;
+}
+
+.notify-guide-dialog h3 {
+    font-size: 20px;
+    margin-bottom: 10px;
+    color: var(--text-primary);
+}
+
+.notify-guide-text {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.7;
+}
+
+.notify-guide-steps {
+    margin: 14px 0 0;
+    padding-left: 20px;
+    color: var(--text-secondary);
+    font-size: 13px;
+    line-height: 1.7;
+}
+
+.notify-guide-steps li + li {
+    margin-top: 6px;
+}
+
+.notify-guide-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 18px;
+}
+
+.notify-guide-actions button {
+    width: auto;
+    flex: 1;
+}
+
+.notify-guide-note {
+    margin-top: 14px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: rgba(76, 175, 80, 0.08);
+    color: var(--text-secondary);
+    font-size: 12px;
+    line-height: 1.6;
+}
+
 /* === 确认弹窗 === */
 .confirm-dialog {
     background: white;
@@ -1880,7 +1948,7 @@ body {
             radial-gradient(circle at 80% 20%, rgba(255, 193, 7, 0.05) 0%, transparent 50%);
     }
     
-    .modal, .confirm-dialog, .alarm-popup {
+    .modal, .confirm-dialog, .alarm-popup, .notify-guide-dialog {
         background: var(--bg-card);
         color: var(--text-primary);
     }
@@ -2025,6 +2093,27 @@ body {
 
 .sync-actions button {
     width: 100%;
+}
+
+.config-transfer-entry {
+    padding: 12px 14px;
+    border: 1px dashed rgba(76, 175, 80, 0.24);
+    border-radius: 12px;
+    background: rgba(76, 175, 80, 0.04);
+}
+
+.config-transfer-entry .setting-row label {
+    margin-bottom: 0;
+    color: var(--text-primary);
+}
+
+.config-transfer-hint {
+    margin: 6px 0 12px;
+    line-height: 1.6;
+}
+
+.config-transfer-actions {
+    margin-top: 6px;
 }
 
 .sync-status-bar {

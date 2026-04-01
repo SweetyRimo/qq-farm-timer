@@ -173,13 +173,7 @@ function loadState() {
             }
             
             // 恢复设置UI
-            setTimeout(() => {
-                document.getElementById('volume-slider').value = state.settings.volume;
-                document.getElementById('notify-sound').checked = state.settings.notifySound;
-                document.getElementById('notify-vibrate').checked = state.settings.notifyVibrate;
-                document.getElementById('notify-push').checked = state.settings.notifyPush;
-                document.getElementById('alarm-sound-select').value = state.settings.alarmSound;
-            }, 100);
+            refreshSettingsForm();
         }
     } catch (e) {
         console.warn('加载状态失败:', e);
@@ -1520,6 +1514,22 @@ function toggleSettings() {
     modal.style.display = modal.style.display === 'none' ? 'flex' : 'none';
 }
 
+function refreshSettingsForm() {
+    setTimeout(() => {
+        const volume = document.getElementById('volume-slider');
+        const sound = document.getElementById('notify-sound');
+        const vibrate = document.getElementById('notify-vibrate');
+        const push = document.getElementById('notify-push');
+        const alarmSound = document.getElementById('alarm-sound-select');
+
+        if (volume) volume.value = state.settings.volume;
+        if (sound) sound.checked = state.settings.notifySound;
+        if (vibrate) vibrate.checked = state.settings.notifyVibrate;
+        if (push) push.checked = state.settings.notifyPush;
+        if (alarmSound) alarmSound.value = state.settings.alarmSound;
+    }, 100);
+}
+
 function updateVolume(value) {
     state.settings.volume = parseInt(value);
     saveState();
@@ -1536,15 +1546,176 @@ function updateAlarmSound(value) {
 function updateNotifySetting(key) {
     state.settings[key] = document.getElementById(key).checked;
     saveState();
+
+    if (key === 'notifyPush' && state.settings[key]) {
+        requestNotificationPermission({ immediate: true, source: 'toggle' });
+    }
 }
 
 // ========== 通知权限 ==========
-function requestNotificationPermission() {
-    if ('Notification' in window && Notification.permission === 'default') {
-        setTimeout(() => {
-            Notification.requestPermission();
-        }, 3000);
+const NOTIFY_GUIDE_DISMISSED_KEY = 'farm-notify-guide-dismissed-v1';
+
+function getNotificationPermissionState() {
+    if (!('Notification' in window)) return 'unsupported';
+    return Notification.permission;
+}
+
+function rememberNotifyGuideDismissal() {
+    localStorage.setItem(NOTIFY_GUIDE_DISMISSED_KEY, getNotificationPermissionState());
+}
+
+function clearNotifyGuideDismissal() {
+    localStorage.removeItem(NOTIFY_GUIDE_DISMISSED_KEY);
+}
+
+async function requestNotificationPermission(options = {}) {
+    const { immediate = false, source = 'auto' } = options;
+
+    if (!('Notification' in window)) {
+        if (source !== 'auto') showToast('当前浏览器不支持系统通知');
+        return 'unsupported';
     }
+
+    if (Notification.permission !== 'default') {
+        if (Notification.permission === 'granted') {
+            clearNotifyGuideDismissal();
+        }
+        return Notification.permission;
+    }
+
+    const ask = async () => {
+        try {
+            const result = await Notification.requestPermission();
+            if (result === 'granted') {
+                clearNotifyGuideDismissal();
+                if (source !== 'auto') {
+                    showToast('🔔 通知已开启，到点会弹出系统提醒');
+                }
+            } else if (source !== 'auto') {
+                showToast(result === 'denied' ? '通知被拦截了，可稍后手动开启' : '暂未开启通知');
+            }
+            return result;
+        } catch (error) {
+            console.warn('通知权限请求失败:', error);
+            if (source !== 'auto') {
+                showToast('❌ 通知权限请求失败');
+            }
+            return getNotificationPermissionState();
+        }
+    };
+
+    if (immediate) {
+        return ask();
+    }
+
+    setTimeout(() => {
+        ask().catch(() => {});
+    }, 3000);
+    return 'default';
+}
+
+function closeNotificationGuide() {
+    const overlay = document.getElementById('notify-guide-overlay');
+    if (overlay) overlay.remove();
+}
+
+function shouldShowNotificationGuide() {
+    const permission = getNotificationPermissionState();
+    if (permission === 'granted' || permission === 'unsupported') {
+        if (permission === 'granted') clearNotifyGuideDismissal();
+        return false;
+    }
+
+    if (!isPwaInstalled()) return false;
+    return localStorage.getItem(NOTIFY_GUIDE_DISMISSED_KEY) !== permission;
+}
+
+function maybeShowNotificationGuide(options = {}) {
+    const { force = false, delay = 600 } = options;
+    if (!force && !shouldShowNotificationGuide()) return;
+    setTimeout(() => showNotificationGuideModal({ force }), delay);
+}
+
+function showNotificationGuideModal(options = {}) {
+    const { force = false } = options;
+    const permission = getNotificationPermissionState();
+    if (permission === 'granted' || permission === 'unsupported') return;
+    if (!force && !shouldShowNotificationGuide()) return;
+
+    closeNotificationGuide();
+
+    const isBlocked = permission === 'denied';
+    const title = isBlocked ? '通知权限还没放开' : '再开一下通知就更稳了';
+    const description = isBlocked
+        ? '安装到桌面和允许通知是两件事。当前浏览器已经拦截了通知，需要你手动去右上角的网站设置里放开。'
+        : '安装已经完成，但系统提醒还没完全打通。再开启一下通知权限，到点时才更容易弹出横幅提醒。';
+    const note = isBlocked
+        ? '如果你之前点过“阻止”，网页这边无法替你改回，只能去浏览器菜单或地址栏右侧的网站设置里手动改成“允许”。'
+        : '不开通知也能继续用，但到点时主要就只能依赖页面内弹窗、声音或微信推送。';
+    const steps = isBlocked
+        ? `
+            <ol class="notify-guide-steps">
+                <li>点浏览器右上角的锁、铃铛或网站设置入口</li>
+                <li>找到“通知”权限</li>
+                <li>改成“允许”</li>
+                <li>刷新页面或重新打开桌面版</li>
+            </ol>
+        `
+        : `
+            <ol class="notify-guide-steps">
+                <li>点下方“开启通知”</li>
+                <li>浏览器弹窗里选择“允许”</li>
+                <li>之后到点时就更容易收到系统横幅提醒</li>
+            </ol>
+        `;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'notify-guide-overlay';
+    overlay.innerHTML = `
+        <div class="notify-guide-dialog">
+            <div class="notify-guide-icon">🔔</div>
+            <h3>${title}</h3>
+            <div class="notify-guide-text">${description}</div>
+            ${steps}
+            <div class="notify-guide-note">${note}</div>
+            <div class="notify-guide-actions">
+                <button class="secondary-btn notify-guide-later">稍后再说</button>
+                <button class="primary-btn notify-guide-primary">${isBlocked ? '我知道了' : '开启通知'}</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    overlay.querySelector('.notify-guide-later').onclick = () => {
+        rememberNotifyGuideDismissal();
+        closeNotificationGuide();
+    };
+
+    overlay.querySelector('.notify-guide-primary').onclick = async () => {
+        if (isBlocked) {
+            rememberNotifyGuideDismissal();
+            closeNotificationGuide();
+            return;
+        }
+
+        const result = await requestNotificationPermission({ immediate: true, source: 'guide' });
+        if (result === 'granted') {
+            closeNotificationGuide();
+            updatePwaInstallUI();
+            return;
+        }
+
+        showNotificationGuideModal({ force: true });
+    };
+
+    overlay.addEventListener('click', (event) => {
+        if (event.target === overlay) {
+            rememberNotifyGuideDismissal();
+            closeNotificationGuide();
+        }
+    });
 }
 
 // ========== PWA ==========
@@ -1566,14 +1737,21 @@ function initPWA() {
     window.addEventListener('appinstalled', () => {
         deferredInstallPrompt = null;
         pwaInstallReady = false;
+        clearNotifyGuideDismissal();
         updatePwaInstallUI(true);
         showToast('✅ 已安装到桌面，可像 App 一样快速打开');
+        maybeShowNotificationGuide({ force: true, delay: 450 });
     });
 
     const displayModeMedia = window.matchMedia?.('(display-mode: standalone)');
     if (displayModeMedia?.addEventListener) {
-        displayModeMedia.addEventListener('change', () => updatePwaInstallUI());
+        displayModeMedia.addEventListener('change', () => {
+            updatePwaInstallUI();
+            maybeShowNotificationGuide({ delay: 350 });
+        });
     }
+
+    maybeShowNotificationGuide({ delay: 900 });
 }
 
 function registerServiceWorker() {
@@ -1597,6 +1775,8 @@ function updatePwaInstallUI(forceInstalled = false) {
     const installButtons = document.querySelectorAll('[data-pwa-install]');
     const installHint = document.getElementById('pwa-install-hint');
     const installBadge = document.getElementById('pwa-install-badge');
+    const notificationPermission = getNotificationPermissionState();
+    const notificationReady = notificationPermission === 'granted';
 
     installButtons.forEach(btn => {
         const textEl = btn.querySelector('.install-btn-text, .install-btn-copy');
@@ -1606,9 +1786,10 @@ function updatePwaInstallUI(forceInstalled = false) {
         btn.disabled = false;
 
         if (isInstalled) {
-            btn.disabled = true;
-            btn.title = '已安装到桌面';
-            if (textEl) textEl.textContent = '已安装';
+            const shouldKeepGuideEntry = !isHeaderBtn && !notificationReady;
+            btn.disabled = !shouldKeepGuideEntry;
+            btn.title = shouldKeepGuideEntry ? '查看通知指引' : '已安装到桌面';
+            if (textEl) textEl.textContent = shouldKeepGuideEntry ? '开启通知' : '已安装';
             return;
         }
 
@@ -1622,17 +1803,22 @@ function updatePwaInstallUI(forceInstalled = false) {
 
     if (installBadge) {
         installBadge.className = 'pwa-badge';
-        installBadge.textContent = isInstalled ? '已安装' : (pwaInstallReady ? '可安装' : '指引');
         if (isInstalled) {
-            installBadge.classList.add('installed');
-        } else if (!pwaInstallReady) {
-            installBadge.classList.add('muted');
+            installBadge.textContent = notificationReady ? '已安装' : '待开通知';
+            installBadge.classList.add(notificationReady ? 'installed' : 'muted');
+        } else {
+            installBadge.textContent = pwaInstallReady ? '可安装' : '指引';
+            if (!pwaInstallReady) {
+                installBadge.classList.add('muted');
+            }
         }
     }
 
     if (installHint) {
         installHint.textContent = isInstalled
-            ? '当前已作为桌面应用打开，之后可以从桌面或主屏幕直接进入。'
+            ? (notificationReady
+                ? '当前已作为桌面应用打开，通知也已开启，之后可以从桌面直接进入。'
+                : '当前已装到桌面；若想收到系统横幅提醒，还需要再允许浏览器通知。')
             : (pwaInstallReady
                 ? '当前浏览器支持直接安装，装到桌面后可像 App 一样一键打开。'
                 : 'Chrome / Edge 可从浏览器菜单安装；iPhone / iPad 请用“添加到主屏幕”。');
@@ -1641,6 +1827,11 @@ function updatePwaInstallUI(forceInstalled = false) {
 
 async function promptPwaInstall() {
     if (isPwaInstalled()) {
+        if (getNotificationPermissionState() !== 'granted') {
+            maybeShowNotificationGuide({ force: true, delay: 120 });
+            return;
+        }
+
         showToast('已经安装好了，直接从桌面打开就行');
         return;
     }
