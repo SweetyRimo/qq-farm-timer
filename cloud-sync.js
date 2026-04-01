@@ -297,11 +297,25 @@ const CloudSync = {
             // 合并策略：以云端为准，但保留本地运行中的定时器
             const now = new Date();
             
-            // 清理本地过期闹钟
-            state.alerts = state.alerts.filter(a => {
-                if (state.timers[a.id]) return true;
-                return new Date(a.endTime) > now;
-            });
+            // 先把本地已过期闹钟归档到历史，避免同步时直接丢失
+            if (typeof cleanupExpiredAlerts === 'function') {
+                cleanupExpiredAlerts({ save: false, render: false });
+            } else {
+                state.alerts = state.alerts.filter(a => {
+                    if (state.timers[a.id]) return true;
+                    return new Date(a.endTime) > now;
+                });
+            }
+
+            // 先补齐云端中过期但尚未入历史的闹钟
+            if (typeof archiveAlertToHistory === 'function') {
+                cloudAlarms.forEach(alarm => {
+                    if (!alarm?.endTime) return;
+                    if (new Date(alarm.endTime) <= now) {
+                        archiveAlertToHistory(alarm, alarm.endTime);
+                    }
+                });
+            }
 
             // 用云端数据替换本地（仅未过期的）
             const activeCloudAlarms = cloudAlarms.filter(a => {
@@ -317,7 +331,7 @@ const CloudSync = {
             });
             state.alerts = [...activeCloudAlarms];
 
-            // 合并历史记录：本地 + 云端，按 triggeredAt 去重，取最新200条
+            // 合并历史记录：本地 + 云端，按 ID 去重，取最新200条
             const existingHistoryIds = new Set(state.history.map(h => h.id));
             cloudHistory.forEach(h => {
                 if (!existingHistoryIds.has(h.id)) {
@@ -325,7 +339,11 @@ const CloudSync = {
                     existingHistoryIds.add(h.id);
                 }
             });
-            state.history = state.history.slice(-200);
+            if (typeof sortHistoryItems === 'function') {
+                state.history = sortHistoryItems(state.history).slice(-200);
+            } else {
+                state.history = state.history.slice(-200);
+            }
 
             // 合并自定义植物：云端 + 本地，按名称去重
             let customPlantMerged = false;
@@ -374,7 +392,6 @@ const CloudSync = {
             if (customPlantMerged) {
                 renderPlantGrid(document.getElementById('plant-search-input')?.value || '');
                 if (typeof renderCustomPlantsList === 'function') renderCustomPlantsList();
-                if (typeof populatePlantSelects === 'function') populatePlantSelects();
             }
             this.updateUI();
 

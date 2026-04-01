@@ -72,23 +72,64 @@ body {
     gap: 8px;
 }
 
-.sync-header-btn {
-    background: rgba(255,255,255,0.2);
-    border: none;
-    color: white;
-    font-size: 18px;
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    cursor: pointer;
-    transition: all 0.2s;
-    display: flex;
+.header-bubble-btn {
+    display: inline-flex;
     align-items: center;
     justify-content: center;
+    height: 36px;
+    min-height: 36px;
+    border: none;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.18);
+    color: white;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
+    backdrop-filter: blur(6px);
 }
 
-.sync-header-btn:hover {
-    background: rgba(255,255,255,0.3);
+.header-bubble-btn:hover {
+    background: rgba(255,255,255,0.28);
+}
+
+.sync-header-btn,
+.settings-btn {
+    width: 36px;
+    min-width: 36px;
+    padding: 0;
+}
+
+.sync-header-btn {
+    font-size: 18px;
+}
+
+.install-header-btn {
+    min-width: 78px;
+    padding: 0 12px;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+}
+
+.install-btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.install-icon-svg {
+    width: 14px;
+    height: 14px;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.install-header-btn .install-btn-text {
+    display: inline-block;
+    line-height: 1;
 }
 
 .sync-header-btn.syncing {
@@ -101,19 +142,10 @@ body {
 }
 
 .settings-btn {
-    background: rgba(255,255,255,0.2);
-    border: none;
-    color: white;
-    font-size: 20px;
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    cursor: pointer;
-    transition: all 0.2s;
+    font-size: 18px;
 }
 
 .settings-btn:hover {
-    background: rgba(255,255,255,0.3);
     transform: rotate(90deg);
 }
 
@@ -201,8 +233,8 @@ body {
 .time-picker {
     display: flex;
     justify-content: center;
-    gap: 8px;
-    margin: 20px 0;
+    gap: 12px;
+    margin: 16px 0 12px;
 }
 
 .wheel-group {
@@ -267,23 +299,24 @@ body {
 
 /* === 快捷时间 === */
 .quick-times {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 8px;
-    margin: 16px 0;
-    justify-content: center;
+    margin: 12px 0 14px;
 }
 
 .quick-times button {
-    padding: 8px 14px;
+    padding: 9px 6px;
     border: 2px solid var(--border);
     background: white;
-    border-radius: 20px;
+    border-radius: 16px;
     font-size: 13px;
     color: var(--text-secondary);
     cursor: pointer;
     transition: all 0.2s;
-    font-weight: 500;
+    font-weight: 600;
+    text-align: center;
+    white-space: nowrap;
 }
 
 .quick-times button:hover {
@@ -299,67 +332,131 @@ body {
 
 /* === 语音控制 === */
 .voice-control {
-    text-align: center;
-    margin: 16px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    margin: 10px 0 12px;
 }
 
 .voice-btn {
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-    border: 3px solid var(--accent-green);
-    background: white;
+    width: min(100%, 280px);
+    min-height: 62px;
+    padding: 10px 14px;
+    border-radius: 16px;
+    border: 2px solid rgba(76, 175, 80, 0.22);
+    background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(240,247,230,0.98));
     cursor: pointer;
     display: inline-flex;
-    flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 4px;
-    transition: all 0.3s;
-    box-shadow: 0 4px 15px rgba(76, 175, 80, 0.2);
+    justify-content: flex-start;
+    gap: 10px;
+    text-align: left;
+    transition: all 0.25s ease;
+    box-shadow: 0 6px 18px rgba(76, 175, 80, 0.10);
 }
 
 .voice-btn:hover {
-    transform: scale(1.05);
-    box-shadow: 0 6px 20px rgba(76, 175, 80, 0.3);
+    transform: translateY(-1px);
+    box-shadow: 0 8px 22px rgba(76, 175, 80, 0.14);
 }
 
 .voice-btn.listening {
-    border-color: var(--accent-red);
-    box-shadow: 0 4px 15px rgba(244, 67, 54, 0.3);
+    border-color: rgba(244, 67, 54, 0.45);
+    box-shadow: 0 8px 22px rgba(244, 67, 54, 0.16);
     animation: pulse 1.5s infinite;
 }
 
+.voice-btn.unsupported {
+    opacity: 0.68;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
 @keyframes pulse {
-    0%, 100% { box-shadow: 0 4px 15px rgba(244, 67, 54, 0.3); }
-    50% { box-shadow: 0 4px 30px rgba(244, 67, 54, 0.5); }
+    0%, 100% { box-shadow: 0 6px 18px rgba(244, 67, 54, 0.16); }
+    50% { box-shadow: 0 10px 24px rgba(244, 67, 54, 0.24); }
 }
 
 .voice-icon {
-    font-size: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(76, 175, 80, 0.12);
+    font-size: 19px;
+    flex-shrink: 0;
+}
+
+.voice-btn.listening .voice-icon {
+    background: rgba(244, 67, 54, 0.12);
 }
 
 .voice-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+}
+
+.voice-text strong {
+    font-size: 15px;
+    color: var(--text-primary);
+    line-height: 1.2;
+}
+
+.voice-text small {
     font-size: 11px;
     color: var(--text-muted);
-    font-weight: 500;
+    line-height: 1.35;
 }
 
 .voice-hint {
-    font-size: 13px;
+    width: min(100%, 280px);
+    font-size: 12px;
     color: var(--text-muted);
-    margin-top: 8px;
+    line-height: 1.35;
+    text-align: center;
 }
 
 .voice-result {
-    display: none;
-    margin-top: 8px;
-    padding: 8px 16px;
-    background: rgba(76, 175, 80, 0.1);
+    width: min(100%, 300px);
+    padding: 8px 12px;
     border-radius: 12px;
-    font-size: 14px;
-    color: var(--accent-dark);
+    font-size: 12px;
+    line-height: 1.45;
+    text-align: left;
     animation: fadeIn 0.3s ease;
+}
+
+.voice-result.is-empty {
+    display: none;
+}
+
+.voice-result.info {
+    display: block;
+    color: var(--accent-dark);
+    background: rgba(76, 175, 80, 0.1);
+}
+
+.voice-result.success {
+    display: block;
+    color: #1f6a27;
+    background: rgba(76, 175, 80, 0.16);
+}
+
+.voice-result.error {
+    display: block;
+    color: #a52b22;
+    background: rgba(244, 67, 54, 0.12);
+}
+
+.voice-result.muted {
+    display: block;
+    color: var(--text-secondary);
+    background: rgba(139, 168, 122, 0.14);
 }
 
 /* === 主按钮 === */
@@ -401,6 +498,46 @@ body {
 .secondary-btn:hover {
     border-color: var(--accent-green);
     color: var(--accent-dark);
+}
+
+.secondary-btn:disabled,
+.sync-header-btn:disabled,
+.install-header-btn:disabled {
+    opacity: 0.65;
+    cursor: default;
+}
+
+.install-pwa-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-height: 36px;
+    width: auto;
+    padding: 8px 12px;
+    border-radius: 10px;
+    border-color: rgba(76, 175, 80, 0.18);
+    background: rgba(255,255,255,0.92);
+    color: var(--accent-dark);
+    font-size: 12px;
+    font-weight: 600;
+    box-shadow: none;
+}
+
+.install-pwa-btn .install-btn-icon {
+    font-size: 14px;
+}
+
+.install-pwa-btn .install-btn-copy {
+    font-weight: 600;
+    letter-spacing: 0.1px;
+    line-height: 1;
+}
+
+.install-pwa-btn:disabled {
+    background: rgba(255,255,255,0.82);
+    border-color: rgba(76, 175, 80, 0.12);
+    color: var(--text-secondary);
 }
 
 .danger-btn {
@@ -491,8 +628,9 @@ body {
 /* === 土地类型选择器 === */
 .land-selector {
     display: flex;
-    align-items: center;
-    gap: 10px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
     margin-bottom: 8px;
 }
 
@@ -504,22 +642,24 @@ body {
 }
 
 .land-options {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 6px;
-    flex-wrap: wrap;
+    width: 100%;
 }
 
 .land-btn {
-    padding: 6px 12px;
+    padding: 7px 4px;
     border: 2px solid var(--border);
-    border-radius: 20px;
+    border-radius: 16px;
     background: white;
-    font-size: 13px;
+    font-size: 12px;
     cursor: pointer;
     transition: all 0.2s;
-    font-weight: 500;
+    font-weight: 600;
     color: var(--text-secondary);
     white-space: nowrap;
+    text-align: center;
 }
 
 .land-btn:hover {
@@ -764,118 +904,11 @@ body {
     font-size: 14px;
 }
 
-/* === 上传区域 === */
 .hint-text {
     font-size: 13px;
     color: var(--text-muted);
     margin-bottom: 12px;
     line-height: 1.5;
-}
-
-.upload-area {
-    border: 2px dashed var(--border);
-    border-radius: var(--radius-sm);
-    padding: 24px;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.2s;
-    color: var(--text-muted);
-    margin-bottom: 8px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-}
-
-.upload-area:hover {
-    border-color: var(--accent-green);
-    background: rgba(76, 175, 80, 0.05);
-    color: var(--accent-dark);
-}
-
-.upload-icon {
-    font-size: 32px;
-}
-
-#screenshot-preview {
-    margin-top: 12px;
-    text-align: center;
-}
-
-#screenshot-preview img {
-    max-width: 100%;
-    max-height: 200px;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
-}
-
-.ocr-note {
-    background: rgba(255, 193, 7, 0.1);
-    border-radius: var(--radius-sm);
-    padding: 10px;
-    font-size: 13px;
-    color: #F57F17;
-    text-align: left;
-    margin-top: 8px;
-}
-
-.ocr-note p {
-    margin-bottom: 4px;
-}
-
-/* === 手动输入 === */
-.ocr-manual {
-    margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px solid var(--border);
-}
-
-.ocr-manual h3 {
-    font-size: 15px;
-    margin-bottom: 12px;
-}
-
-.manual-entry {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 8px;
-    flex-wrap: wrap;
-}
-
-.manual-entry select {
-    padding: 8px;
-    border: 2px solid var(--border);
-    border-radius: 8px;
-    font-size: 13px;
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    outline: none;
-    min-width: 120px;
-}
-
-.manual-entry select:focus {
-    border-color: var(--accent-green);
-}
-
-.manual-entry input {
-    width: 50px;
-    padding: 8px;
-    border: 2px solid var(--border);
-    border-radius: 8px;
-    font-size: 14px;
-    text-align: center;
-    outline: none;
-    background: var(--bg-primary);
-}
-
-.manual-entry input:focus {
-    border-color: var(--accent-green);
-}
-
-.manual-entry span {
-    font-size: 13px;
-    color: var(--text-muted);
 }
 
 .remove-entry {
@@ -896,16 +929,6 @@ body {
 .remove-entry:hover {
     background: var(--accent-red);
     color: white;
-}
-
-.form-actions {
-    display: flex;
-    gap: 8px;
-    margin-top: 12px;
-}
-
-.form-actions .secondary-btn {
-    flex-shrink: 0;
 }
 
 /* === 睡眠方案 === */
@@ -1395,6 +1418,13 @@ body {
     margin-bottom: 16px;
 }
 
+.setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
 .setting-item label {
     display: block;
     font-size: 14px;
@@ -1546,6 +1576,20 @@ body {
 
 /* === 响应式 === */
 @media (max-width: 360px) {
+    .install-header-btn {
+        width: 30px;
+        height: 30px;
+    }
+
+    .install-pwa-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .pwa-entry {
+        padding: 12px;
+    }
+
     .plant-grid {
         grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 4px;
@@ -1576,6 +1620,26 @@ body {
     .wheel-btn {
         width: 40px;
         height: 24px;
+    }
+
+    .quick-times {
+        gap: 6px;
+    }
+
+    .quick-times button,
+    .land-btn {
+        font-size: 11px;
+        padding: 7px 2px;
+    }
+
+    .voice-btn {
+        width: 100%;
+        min-height: 58px;
+    }
+
+    .voice-hint,
+    .voice-result {
+        width: 100%;
     }
 }
 
@@ -1761,11 +1825,6 @@ body {
             radial-gradient(circle at 80% 20%, rgba(255, 193, 7, 0.05) 0%, transparent 50%);
     }
     
-    .upload-area {
-        border-color: var(--border);
-        background: rgba(45, 80, 22, 0.2);
-    }
-    
     .modal, .confirm-dialog, .alarm-popup {
         background: var(--bg-card);
         color: var(--text-primary);
@@ -1783,6 +1842,48 @@ body {
     height: 1px;
     background: var(--border);
     margin: 16px 0;
+}
+
+.pwa-entry {
+    padding: 12px 14px;
+    border: 1px solid rgba(76, 175, 80, 0.12);
+    border-radius: 12px;
+    background: rgba(76, 175, 80, 0.05);
+}
+
+.pwa-entry .setting-row label {
+    margin-bottom: 0;
+    color: var(--text-primary);
+}
+
+.pwa-install-desc {
+    margin: 6px 0 10px;
+}
+
+.pwa-badge {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 46px;
+    height: 20px;
+    padding: 0 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    color: var(--accent-dark);
+    background: rgba(76, 175, 80, 0.12);
+}
+
+.pwa-badge.muted {
+    color: var(--text-muted);
+    background: rgba(139, 168, 122, 0.16);
+}
+
+.pwa-badge.installed {
+    color: #1f6a27;
+    background: rgba(76, 175, 80, 0.2);
 }
 
 .sync-status {

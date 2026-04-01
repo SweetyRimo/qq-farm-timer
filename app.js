@@ -29,15 +29,14 @@ document.addEventListener('DOMContentLoaded', () => {
     renderHistoryList();
     renderRunningTimers();
     initVoice();
-    initPasteHandler();
     initScrollWheels();
     requestNotificationPermission();
     startTimerLoop();
-    populatePlantSelects();
     cleanupExpiredAlerts();
     updateSyncStatusBar();
     renderCustomPlantsList();
     initSeasonHint();
+    initPWA();
     selectLand(state.selectedLand || 'normal');
 
     // 每秒更新运行中的定时器显示
@@ -64,17 +63,66 @@ function updateSyncStatusBar() {
 }
 
 // ========== 清理过期闹钟 ==========
-function cleanupExpiredAlerts() {
-    const now = new Date();
-    const before = state.alerts.length;
-    state.alerts = state.alerts.filter(a => {
-        if (state.timers[a.id]) return true; // 还在运行中
-        return new Date(a.endTime) > now;
+function sortHistoryItems(items = []) {
+    return items.sort((a, b) => {
+        const aTime = new Date(a.triggeredAt || a.endTime || 0).getTime();
+        const bTime = new Date(b.triggeredAt || b.endTime || 0).getTime();
+        return aTime - bTime;
     });
-    if (state.alerts.length !== before) {
-        saveState();
-        renderAlertsList();
+}
+
+function archiveAlertToHistory(alert, triggeredAt = null) {
+    if (!alert?.id) return false;
+
+    const historyItem = {
+        id: alert.id,
+        label: alert.label,
+        plant: alert.plant,
+        endTime: alert.endTime,
+        totalSeconds: alert.totalSeconds,
+        triggeredAt: triggeredAt || alert.triggeredAt || alert.endTime || new Date().toISOString()
+    };
+
+    const existingIndex = state.history.findIndex(item => item.id === historyItem.id);
+    if (existingIndex >= 0) {
+        state.history[existingIndex] = {
+            ...state.history[existingIndex],
+            ...historyItem,
+            triggeredAt: state.history[existingIndex].triggeredAt || historyItem.triggeredAt
+        };
+        state.history = sortHistoryItems(state.history).slice(-200);
+        return false;
     }
+
+    state.history.push(historyItem);
+    state.history = sortHistoryItems(state.history).slice(-200);
+    return true;
+}
+
+function cleanupExpiredAlerts(options = {}) {
+    const now = Date.now();
+    const beforeCount = state.alerts.length;
+    let historyChanged = false;
+
+    state.alerts = state.alerts.filter(alert => {
+        if (state.timers[alert.id]) return true; // 还在运行中
+
+        const endTime = new Date(alert.endTime).getTime();
+        if (Number.isFinite(endTime) && endTime <= now) {
+            historyChanged = archiveAlertToHistory(alert, alert.endTime) || historyChanged;
+            return false;
+        }
+
+        return true;
+    });
+
+    const alertsChanged = state.alerts.length !== beforeCount;
+    if (alertsChanged || historyChanged) {
+        if (options.save !== false) saveState();
+        if (options.render !== false) renderAlertsList();
+    }
+
+    return alertsChanged || historyChanged;
 }
 
 // ========== 状态持久化 ==========
@@ -106,9 +154,12 @@ function loadState() {
     try {
         const data = JSON.parse(localStorage.getItem('farm-timer-state'));
         if (data) {
-            state.alerts = data.alerts || [];
-            state.history = data.history || [];
+            state.alerts = Array.isArray(data.alerts) ? data.alerts : [];
+            state.history = Array.isArray(data.history) ? data.history : [];
+            state.history = sortHistoryItems(state.history).slice(-200);
             state.settings = { ...state.settings, ...data.settings };
+
+            const recoveredExpiredAlerts = cleanupExpiredAlerts({ save: false, render: false });
             
             // 恢复未过期的闹钟为定时器
             state.alerts.forEach(alert => {
@@ -116,6 +167,10 @@ function loadState() {
                     state.timers[alert.id] = alert;
                 }
             });
+
+            if (recoveredExpiredAlerts) {
+                saveState();
+            }
             
             // 恢复设置UI
             setTimeout(() => {
@@ -142,12 +197,13 @@ function switchTab(tabName) {
 }
 
 // ========== 滚轮时间选择器 ==========
-let wheelValues = { hour: 0, minute: 0, second: 0 };
+let wheelValues = { hour: 0, minute: 0 };
 
 function initScrollWheels() {
     // 鼠标滚轮支持
-    ['hour', 'minute', 'second'].forEach(type => {
+    ['hour', 'minute'].forEach(type => {
         const display = document.getElementById(`${type}-display`);
+        if (!display) return;
         
         display.addEventListener('wheel', (e) => {
             e.preventDefault();
@@ -186,31 +242,30 @@ function initScrollWheels() {
 }
 
 function wheelAdjust(type, delta) {
-    const max = { hour: 72, minute: 59, second: 59 };
-    const step = type === 'hour' ? 1 : (type === 'minute' ? 1 : 5);
+    const max = { hour: 72, minute: 59 };
+    const step = 1;
     
     wheelValues[type] += delta * step;
     if (wheelValues[type] < 0) wheelValues[type] = max[type];
     if (wheelValues[type] > max[type]) wheelValues[type] = 0;
     
     const display = document.getElementById(`${type}-display`);
+    if (!display) return;
     display.textContent = String(wheelValues[type]).padStart(2, '0');
     display.style.transform = 'scale(1.1)';
     setTimeout(() => { display.style.transform = 'scale(1)'; }, 150);
 }
 
 function setQuickTime(seconds) {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = seconds % 60;
+    const totalMinutes = Math.max(0, Math.ceil(seconds / 60));
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
     
     wheelValues.hour = h;
     wheelValues.minute = m;
-    wheelValues.second = s;
     
     document.getElementById('hour-display').textContent = String(h).padStart(2, '0');
     document.getElementById('minute-display').textContent = String(m).padStart(2, '0');
-    document.getElementById('second-display').textContent = String(s).padStart(2, '0');
     
     // 视觉反馈
     document.querySelectorAll('.wheel-display').forEach(el => {
@@ -224,106 +279,283 @@ function setQuickTime(seconds) {
 }
 
 function getTotalSeconds() {
-    return wheelValues.hour * 3600 + wheelValues.minute * 60 + wheelValues.second;
+    return wheelValues.hour * 3600 + wheelValues.minute * 60;
 }
 
 // ========== 语音控制 ==========
-function initVoice() {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-        document.getElementById('voice-btn').style.opacity = '0.5';
-        document.getElementById('voice-hint').textContent = '当前浏览器不支持语音识别';
+let voiceSession = {
+    hasResult: false,
+    finalHandled: false,
+    lastTranscript: '',
+    stopReason: 'idle',
+    autoStopTimer: null
+};
+
+function getVoiceElements() {
+    return {
+        btn: document.getElementById('voice-btn'),
+        title: document.getElementById('voice-btn-title'),
+        subtitle: document.getElementById('voice-btn-subtitle'),
+        hint: document.getElementById('voice-hint'),
+        result: document.getElementById('voice-result')
+    };
+}
+
+function resetVoiceSession() {
+    clearVoiceAutoStop();
+    voiceSession = {
+        hasResult: false,
+        finalHandled: false,
+        lastTranscript: '',
+        stopReason: 'listening',
+        autoStopTimer: null
+    };
+}
+
+function clearVoiceAutoStop() {
+    if (voiceSession.autoStopTimer) {
+        clearTimeout(voiceSession.autoStopTimer);
+        voiceSession.autoStopTimer = null;
+    }
+}
+
+function scheduleVoiceAutoStop() {
+    clearVoiceAutoStop();
+    voiceSession.autoStopTimer = setTimeout(() => {
+        if (!state.voiceActive || !state.recognition) return;
+        voiceSession.stopReason = voiceSession.hasResult ? 'timeout_after_result' : 'timeout_empty';
+        state.recognition.stop();
+    }, 8000);
+}
+
+function setVoiceResult(message = '', type = 'info') {
+    const { result } = getVoiceElements();
+    if (!result) return;
+
+    if (!message) {
+        result.textContent = '';
+        result.className = 'voice-result is-empty';
         return;
     }
-    
+
+    result.textContent = message;
+    result.className = `voice-result ${type}`;
+}
+
+function mapVoiceError(error) {
+    const errorMap = {
+        'not-allowed': '麦克风权限被拒绝了，请先允许浏览器使用麦克风。',
+        'service-not-allowed': '当前浏览器禁止了语音识别服务，请换 Chrome / Edge 再试。',
+        'no-speech': '没有听到有效语音，请靠近麦克风后再试。',
+        'audio-capture': '没有检测到可用麦克风设备。',
+        'network': '语音识别服务连接失败，请检查网络后重试。',
+        'aborted': '语音识别已中断，请再试一次。'
+    };
+
+    return errorMap[error] || '语音识别失败了，请稍后重试。';
+}
+
+function parseChineseNumber(text) {
+    if (!text) return NaN;
+    if (/^\d+(?:\.\d+)?$/.test(text)) return parseFloat(text);
+    if (text === '半') return 0.5;
+
+    const digitMap = { 零: 0, 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 };
+    const unitMap = { 十: 10, 百: 100 };
+    let result = 0;
+    let current = 0;
+
+    for (const char of text) {
+        if (digitMap[char] !== undefined) {
+            current = digitMap[char];
+        } else if (unitMap[char]) {
+            const unit = unitMap[char];
+            if (current === 0) current = 1;
+            result += current * unit;
+            current = 0;
+        } else {
+            return NaN;
+        }
+    }
+
+    return result + current;
+}
+
+function normalizeVoiceInput(rawText) {
+    let text = (rawText || '').replace(/[，。、“”！？,.!?]/g, ' ').replace(/\s+/g, ' ').trim();
+
+    text = text
+        .replace(/([零一二两三四五六七八九十百\d]+)个半小时/g, (_, num) => `${parseChineseNumber(num) + 0.5}小时`)
+        .replace(/半个小时|半小时/g, '30分钟')
+        .replace(/一刻钟/g, '15分钟')
+        .replace(/两刻钟/g, '30分钟')
+        .replace(/三刻钟/g, '45分钟');
+
+    return text.replace(/([零一二两三四五六七八九十百半\d]+)(?=(个)?(小时|分钟|分|秒))/g, match => {
+        const parsed = parseChineseNumber(match);
+        return Number.isNaN(parsed) ? match : String(parsed);
+    });
+}
+
+function initVoice() {
+    const { btn, hint } = getVoiceElements();
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+        if (btn) {
+            btn.disabled = true;
+            btn.classList.add('unsupported');
+        }
+        if (hint) {
+            hint.textContent = '当前浏览器不支持语音识别，请使用 Chrome / Edge。';
+        }
+        setVoiceResult('语音输入当前不可用。你仍可使用上方滚轮或快捷按钮设置时间。', 'muted');
+        return;
+    }
+
     state.recognition = new SpeechRecognition();
     state.recognition.lang = 'zh-CN';
     state.recognition.continuous = false;
     state.recognition.interimResults = true;
-    
+    state.recognition.maxAlternatives = 1;
+
+    state.recognition.onstart = () => {
+        state.voiceActive = true;
+        voiceSession.stopReason = 'listening';
+        updateVoiceUI();
+        setVoiceResult('正在听，请直接说“30分钟”“2小时10分”或植物名。', 'info');
+        scheduleVoiceAutoStop();
+    };
+
     state.recognition.onresult = (event) => {
+        scheduleVoiceAutoStop();
         let transcript = '';
         for (let i = event.resultIndex; i < event.results.length; i++) {
             transcript += event.results[i][0].transcript;
         }
-        
-        document.getElementById('voice-result').textContent = `🎤 "${transcript}"`;
-        document.getElementById('voice-result').style.display = 'block';
-        
-        if (event.results[event.results.length - 1].isFinal) {
-            parseVoiceCommand(transcript);
+
+        const cleanedTranscript = transcript.trim();
+        if (!cleanedTranscript) return;
+
+        voiceSession.hasResult = true;
+        voiceSession.lastTranscript = cleanedTranscript;
+
+        const isFinal = event.results[event.results.length - 1].isFinal;
+        setVoiceResult(`识别到：${cleanedTranscript}${isFinal ? '' : '…'}`, isFinal ? 'success' : 'info');
+
+        if (isFinal) {
+            const parsed = parseVoiceCommand(cleanedTranscript);
+            voiceSession.finalHandled = parsed;
+            voiceSession.stopReason = parsed ? 'success' : 'no_match';
         }
     };
-    
-    state.recognition.onend = () => {
-        state.voiceActive = false;
-        updateVoiceUI();
-    };
-    
+
     state.recognition.onerror = (event) => {
+        clearVoiceAutoStop();
+        voiceSession.stopReason = 'error';
+        const message = mapVoiceError(event.error);
         console.error('语音识别错误:', event.error);
+        setVoiceResult(message, 'error');
+        showToast(message);
+    };
+
+    state.recognition.onend = () => {
+        clearVoiceAutoStop();
+        const reason = voiceSession.stopReason;
+        const hadResult = voiceSession.hasResult;
         state.voiceActive = false;
         updateVoiceUI();
-        if (event.error === 'not-allowed') {
-            document.getElementById('voice-hint').textContent = '请允许使用麦克风权限';
+
+        if (reason === 'error' || reason === 'success' || reason === 'no_match') {
+            return;
+        }
+
+        if (!hadResult) {
+            const emptyMessage = reason === 'manual-stop'
+                ? '已停止聆听，尚未识别到内容。'
+                : '这次没有听清，请靠近麦克风并直接说“30分钟后提醒我”或植物名。';
+            setVoiceResult(emptyMessage, reason === 'manual-stop' ? 'muted' : 'error');
+            if (reason !== 'manual-stop') showToast('没有识别到有效语音内容');
+            return;
+        }
+
+        if (!voiceSession.finalHandled) {
+            setVoiceResult(`已捕获语音：${voiceSession.lastTranscript}，但还没听懂具体时间。可再说得更直接一些。`, 'error');
         }
     };
+
+    updateVoiceUI();
 }
 
 function toggleVoice() {
     if (!state.recognition) {
-        showToast('当前浏览器不支持语音识别，请使用Chrome');
+        showToast('当前浏览器不支持语音识别，请使用 Chrome / Edge');
         return;
     }
-    
+
     if (state.voiceActive) {
+        voiceSession.stopReason = 'manual-stop';
+        clearVoiceAutoStop();
         state.recognition.stop();
-    } else {
-        try {
-            state.recognition.start();
-            state.voiceActive = true;
-            updateVoiceUI();
-            document.getElementById('voice-result').style.display = 'none';
-        } catch(e) {
-            showToast('语音识别启动失败，请重试');
-        }
+        return;
+    }
+
+    try {
+        resetVoiceSession();
+        setVoiceResult('', 'info');
+        state.recognition.start();
+    } catch (error) {
+        console.error('语音识别启动失败:', error);
+        setVoiceResult('语音识别启动失败，请稍后重试。', 'error');
+        showToast('语音识别启动失败，请重试');
     }
 }
 
 function updateVoiceUI() {
-    const btn = document.getElementById('voice-btn');
+    const { btn, title, subtitle, hint } = getVoiceElements();
+    if (!btn) return;
+
+    btn.classList.toggle('listening', !!state.voiceActive);
+    btn.classList.toggle('unsupported', !state.recognition);
+
+    if (!state.recognition) {
+        if (title) title.textContent = '语音输入不可用';
+        if (subtitle) subtitle.textContent = '请改用 Chrome / Edge';
+        if (hint) hint.textContent = '当前浏览器不支持语音识别，请使用 Chrome / Edge。';
+        return;
+    }
+
     if (state.voiceActive) {
-        btn.classList.add('listening');
-        document.getElementById('voice-hint').textContent = '正在聆听...请说出时间或植物名称';
+        if (title) title.textContent = '正在聆听';
+        if (subtitle) subtitle.textContent = '再点一次可停止';
+        if (hint) hint.textContent = '请直接说完整指令，例如“30分钟后提醒我”或某个植物名。';
     } else {
-        btn.classList.remove('listening');
-        document.getElementById('voice-hint').textContent = '试试说："30分钟后提醒我"';
+        if (title) title.textContent = '语音输入';
+        if (subtitle) subtitle.textContent = '点一下说时间';
+        if (hint) hint.textContent = 'Chrome / Edge，可说“30分钟”或植物名。';
     }
 }
 
 function parseVoiceCommand(text) {
-    text = text.replace(/\s/g, '');
-    
-    // 解析时间表达式
+    const normalizedText = normalizeVoiceInput(text).replace(/\s/g, '');
+
     let totalSeconds = 0;
     let plantName = '';
     let plantGrowHours = 0;
-    
-    // 匹配 "X小时Y分钟后提醒"
-    const hourMatch = text.match(/(\d+)\s*小时/);
-    const minMatch = text.match(/(\d+)\s*分[钟]?/);
-    const secMatch = text.match(/(\d+)\s*秒/);
-    
-    if (hourMatch) totalSeconds += parseInt(hourMatch[1]) * 3600;
-    if (minMatch) totalSeconds += parseInt(minMatch[1]) * 60;
-    if (secMatch) totalSeconds += parseInt(secMatch[1]);
-    
-    // 如果没有明确时间，尝试匹配植物名称
+
+    const hourMatch = normalizedText.match(/(\d+(?:\.\d+)?)\s*小时/);
+    const minMatch = normalizedText.match(/(\d+(?:\.\d+)?)\s*分[钟]?/);
+    const secMatch = normalizedText.match(/(\d+(?:\.\d+)?)\s*秒/);
+
+    if (hourMatch) totalSeconds += Math.round(parseFloat(hourMatch[1]) * 3600);
+    if (minMatch) totalSeconds += Math.round(parseFloat(minMatch[1]) * 60);
+    if (secMatch) totalSeconds += Math.round(parseFloat(secMatch[1]));
+
     if (totalSeconds === 0) {
         const plantNames = Object.keys(PLANTS_DATABASE);
         const landType = state.selectedLand || 'normal';
         for (const name of plantNames) {
-            if (text.includes(name)) {
+            if (normalizedText.includes(name)) {
                 plantName = name;
                 plantGrowHours = calcGrowTime(name, landType) || PLANTS_DATABASE[name].growthTime || 0;
                 totalSeconds = Math.round(plantGrowHours * 3600);
@@ -331,22 +563,29 @@ function parseVoiceCommand(text) {
             }
         }
     }
-    
-    if (totalSeconds > 0) {
-        const h = Math.floor(totalSeconds / 3600);
-        const m = Math.floor((totalSeconds % 3600) / 60);
-        const s = totalSeconds % 60;
-        
-        setQuickTime(totalSeconds);
-        
-        if (plantName) {
-            showToast(`🎤 已识别：${plantName}，${plantGrowHours}小时后提醒`);
-        } else {
-            showToast(`🎤 已设置：${h > 0 ? h + '小时' : ''}${m > 0 ? m + '分钟' : ''}${s > 0 ? s + '秒' : ''}`);
-        }
-    } else {
-        showToast('🎤 未识别到有效时间，请重试');
+
+    if (totalSeconds <= 0) {
+        const failMessage = '没听懂这句指令。请直接说“30分钟后提醒我”“1小时半”或植物名。';
+        setVoiceResult(failMessage, 'error');
+        showToast('没听懂语音内容，请换种说法');
+        return false;
     }
+
+    setQuickTime(totalSeconds);
+    const appliedSeconds = getTotalSeconds();
+    const durationText = formatDuration(appliedSeconds) || `${appliedSeconds}秒`;
+
+    if (plantName) {
+        const successMessage = `已识别植物：${plantName}。已按当前土地填入 ${durationText}，现在可以直接点击“开始计时”。`;
+        setVoiceResult(successMessage, 'success');
+        showToast(`🎤 已识别：${plantName}，${plantGrowHours}小时后提醒`);
+        return true;
+    }
+
+    const successMessage = `已识别时间：${durationText}。时间已经填入上方，点“开始计时”就会生效。`;
+    setVoiceResult(successMessage, 'success');
+    showToast(`🎤 已设置：${durationText}`);
+    return true;
 }
 
 // ========== 定时器管理 ==========
@@ -507,7 +746,6 @@ function startTimerLoop() {
             const timer = state.timers[id];
             if (timer && new Date(timer.endTime) <= new Date(now)) {
                 triggerAlarm(timer);
-                delete state.timers[id];
             }
         });
     }, 1000);
@@ -525,17 +763,13 @@ function triggerAlarm(timer) {
         ? `${PLANTS_DATABASE[timer.plant]?.emoji || '🌱'} ${timer.plant || '植物'}成熟了！快去收菜！` 
         : `⏰ 定时结束！${timer.label}`;
     
-    // 写入历史记录
-    state.history.push({
-        id: timer.id,
-        label: timer.label,
-        plant: timer.plant,
-        endTime: timer.endTime,
-        totalSeconds: timer.totalSeconds,
-        triggeredAt: new Date().toISOString()
-    });
+    // 写入历史记录并从当前闹钟中移除
+    archiveAlertToHistory(timer, new Date().toISOString());
+    delete state.timers[timer.id];
+    state.alerts = state.alerts.filter(alert => alert.id !== timer.id);
     saveState();
-    renderHistoryList();
+    renderRunningTimers();
+    renderAlertsList();
     
     // 显示弹窗
     document.getElementById('alarm-message').textContent = message;
@@ -873,143 +1107,6 @@ function updateSeasonHint() {
     const total = Math.round((firstTime + reTime * (seasons - 1)) * 10) / 10;
     
     hintEl.textContent = `再熟${reTime}h · 总计${total}h`;
-}
-
-// ========== 截图识别 ==========
-function initPasteHandler() {
-    document.addEventListener('paste', (e) => {
-        const items = e.clipboardData?.items;
-        if (!items) return;
-        
-        for (let item of items) {
-            if (item.type.indexOf('image') !== -1) {
-                const blob = item.getAsFile();
-                handleImageBlob(blob);
-                break;
-            }
-        }
-    });
-}
-
-function handleScreenshot(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    handleImageBlob(file);
-}
-
-function handleImageBlob(blob) {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        const preview = document.getElementById('screenshot-preview');
-        const img = document.getElementById('preview-img');
-        img.src = e.target.result;
-        preview.style.display = 'block';
-        
-        showToast('📷 截图已加载，请在下方手动输入植物信息（自动OCR识别需要API支持）');
-        document.getElementById('ocr-results').innerHTML = `
-            <div class="ocr-note">
-                <p>⚠️ 自动截图识别功能需要接入OCR识别API，当前版本请手动输入植物信息。</p>
-                <p>请查看截图，在下方选择对应的植物和剩余时间。</p>
-            </div>
-        `;
-        
-        // 自动切换到手动输入区
-        document.getElementById('ocr-manual').scrollIntoView({ behavior: 'smooth' });
-    };
-    reader.readAsDataURL(blob);
-}
-
-function populatePlantSelects() {
-    const selects = document.querySelectorAll('.plant-select');
-    const orderedNames = getOrderedPlantNames();
-    selects.forEach(select => {
-        // 清空现有选项（保留第一个空选项）
-        while (select.options.length > 1) select.remove(1);
-        orderedNames.forEach(name => {
-            const plant = PLANTS_DATABASE[name];
-            const option = document.createElement('option');
-            option.value = name;
-            option.textContent = `${plant.emoji} ${name} (${plant.growthTime}h)`;
-            select.appendChild(option);
-        });
-    });
-}
-
-function addManualEntry() {
-    const container = document.getElementById('manual-entries');
-    const entry = document.createElement('div');
-    entry.className = 'manual-entry';
-    const orderedNames = getOrderedPlantNames();
-    entry.innerHTML = `
-        <select class="plant-select" onchange="updateManualEntry()">
-            <option value="">选择植物</option>
-            ${orderedNames.map(name => 
-                `<option value="${name}">${PLANTS_DATABASE[name].emoji} ${name} (${PLANTS_DATABASE[name].growthTime}h)</option>`
-            ).join('')}
-        </select>
-        <span>成熟还需</span>
-        <input type="number" class="entry-hours" placeholder="时" min="0" max="72" value="0">
-        <span>时</span>
-        <input type="number" class="entry-minutes" placeholder="分" min="0" max="59" value="0">
-        <span>分</span>
-        <button class="remove-entry" onclick="removeManualEntry(this)">✕</button>
-    `;
-    container.appendChild(entry);
-}
-
-function removeManualEntry(btn) {
-    const container = document.getElementById('manual-entries');
-    if (container.children.length > 1) {
-        btn.parentElement.remove();
-    }
-}
-
-function updateManualEntry() {
-    // 当选择植物时，自动填充默认成熟时间
-    // (可选功能)
-}
-
-function applyManualEntries() {
-    const entries = document.querySelectorAll('.manual-entry');
-    let count = 0;
-    
-    entries.forEach(entry => {
-        const plantName = entry.querySelector('.plant-select').value;
-        const hours = parseInt(entry.querySelector('.entry-hours').value) || 0;
-        const minutes = parseInt(entry.querySelector('.entry-minutes').value) || 0;
-        
-        if (hours > 0 || minutes > 0) {
-            const totalSeconds = hours * 3600 + minutes * 60;
-            const id = 'timer_' + Date.now() + '_' + count;
-            const endTime = new Date(Date.now() + totalSeconds * 1000);
-            const plant = PLANTS_DATABASE[plantName];
-            
-            const timer = {
-                id,
-                endTime: endTime.toISOString(),
-                totalSeconds,
-                remainingSeconds: totalSeconds,
-                label: plantName ? `${plant.emoji} ${plantName} (剩余${hours}时${minutes}分)` : `🌱 未知植物 (剩余${hours}时${minutes}分)`,
-                plant: plantName || null,
-                createdAt: new Date().toISOString()
-            };
-            
-            state.timers[id] = timer;
-            state.alerts.push(timer);
-            count++;
-        }
-    });
-    
-    if (count > 0) {
-        saveState();
-        renderRunningTimers();
-        renderAlertsList();
-        showToast(`✅ 已设置 ${count} 个闹钟！`);
-        switchTab('timer');
-        document.getElementById('alarm-list-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    } else {
-        showToast('请至少填写一个植物的时间信息');
-    }
 }
 
 // ========== 睡前种植方案 ==========
@@ -1457,6 +1554,125 @@ function requestNotificationPermission() {
     }
 }
 
+// ========== PWA ==========
+let deferredInstallPrompt = null;
+let pwaInstallReady = false;
+
+function initPWA() {
+    registerServiceWorker();
+    updatePwaInstallUI();
+
+    window.addEventListener('beforeinstallprompt', (event) => {
+        event.preventDefault();
+        deferredInstallPrompt = event;
+        pwaInstallReady = true;
+        updatePwaInstallUI();
+        showToast('📲 可安装到桌面了');
+    });
+
+    window.addEventListener('appinstalled', () => {
+        deferredInstallPrompt = null;
+        pwaInstallReady = false;
+        updatePwaInstallUI(true);
+        showToast('✅ 已安装到桌面，可像 App 一样快速打开');
+    });
+
+    const displayModeMedia = window.matchMedia?.('(display-mode: standalone)');
+    if (displayModeMedia?.addEventListener) {
+        displayModeMedia.addEventListener('change', () => updatePwaInstallUI());
+    }
+}
+
+function registerServiceWorker() {
+    if (!('serviceWorker' in navigator)) return;
+
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').then((registration) => {
+            registration.update().catch(() => {});
+        }).catch((error) => {
+            console.warn('Service Worker 注册失败:', error);
+        });
+    });
+}
+
+function isPwaInstalled() {
+    return window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+
+function updatePwaInstallUI(forceInstalled = false) {
+    const isInstalled = forceInstalled || isPwaInstalled();
+    const installButtons = document.querySelectorAll('[data-pwa-install]');
+    const installHint = document.getElementById('pwa-install-hint');
+    const installBadge = document.getElementById('pwa-install-badge');
+
+    installButtons.forEach(btn => {
+        const textEl = btn.querySelector('.install-btn-text, .install-btn-copy');
+        const isHeaderBtn = btn.dataset.pwaInstall === 'header';
+
+        btn.hidden = false;
+        btn.disabled = false;
+
+        if (isInstalled) {
+            btn.disabled = true;
+            btn.title = '已安装到桌面';
+            if (textEl) textEl.textContent = '已安装';
+            return;
+        }
+
+        btn.title = pwaInstallReady ? '安装到桌面' : '查看安装方法';
+        if (textEl) {
+            textEl.textContent = isHeaderBtn
+                ? '安装'
+                : (pwaInstallReady ? '添加到桌面' : '查看安装方法');
+        }
+    });
+
+    if (installBadge) {
+        installBadge.className = 'pwa-badge';
+        installBadge.textContent = isInstalled ? '已安装' : (pwaInstallReady ? '可安装' : '指引');
+        if (isInstalled) {
+            installBadge.classList.add('installed');
+        } else if (!pwaInstallReady) {
+            installBadge.classList.add('muted');
+        }
+    }
+
+    if (installHint) {
+        installHint.textContent = isInstalled
+            ? '当前已作为桌面应用打开，之后可以从桌面或主屏幕直接进入。'
+            : (pwaInstallReady
+                ? '当前浏览器支持直接安装，装到桌面后可像 App 一样一键打开。'
+                : 'Chrome / Edge 可从浏览器菜单安装；iPhone / iPad 请用“添加到主屏幕”。');
+    }
+}
+
+async function promptPwaInstall() {
+    if (isPwaInstalled()) {
+        showToast('已经安装好了，直接从桌面打开就行');
+        return;
+    }
+
+    if (deferredInstallPrompt) {
+        deferredInstallPrompt.prompt();
+        const { outcome } = await deferredInstallPrompt.userChoice;
+        if (outcome !== 'accepted') {
+            showToast('已取消安装');
+        }
+        deferredInstallPrompt = null;
+        pwaInstallReady = false;
+        updatePwaInstallUI();
+        return;
+    }
+
+    const isAppleDevice = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    if (isAppleDevice) {
+        alert('请点击浏览器的“分享”按钮，再选择“添加到主屏幕”，这样就能把 QQ 农场计时器放到桌面。');
+        return;
+    }
+
+    alert('当前浏览器没有直接弹出安装框。你可以打开浏览器菜单，选择“安装应用”“安装此站点”或“创建快捷方式”。');
+}
+
 // ========== Toast提示 ==========
 function showToast(message) {
     // 移除旧的toast
@@ -1508,11 +1724,6 @@ function showConfirm(title, message, onConfirm) {
     });
 }
 
-// ========== 选择植物自动填充成熟时间 ==========
-function updateManualEntry() {
-    // 这个函数在select onchange时被调用，自动填充该植物的总成熟时间
-}
-
 // ========== 页面可见性恢复时刷新 ==========
 document.addEventListener('visibilitychange', () => {
     if (!document.hidden) {
@@ -1524,9 +1735,9 @@ document.addEventListener('visibilitychange', () => {
             const timer = state.timers[id];
             if (timer && new Date(timer.endTime) <= new Date(now)) {
                 triggerAlarm(timer);
-                delete state.timers[id];
             }
         });
+        cleanupExpiredAlerts();
     }
 });
 

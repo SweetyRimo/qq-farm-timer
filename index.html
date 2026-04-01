@@ -4,11 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>🌾 QQ农场计时器</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌾</text></svg>">
+    <meta name="description" content="QQ农场计时器，支持快速定时、植物种植、睡前方案、云同步与桌面快速打开。">
+    <meta name="application-name" content="QQ农场计时器">
     <meta name="theme-color" content="#4CAF50">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="QQ农场计时器">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png">
 </head>
 <body>
     <div id="app">
@@ -16,10 +22,20 @@
         <header class="app-header">
             <h1>🌾 QQ农场计时器</h1>
             <div class="header-actions">
-                <button class="sync-header-btn" id="header-sync-btn" onclick="CloudSync.syncNow()" title="云同步">
+                <button class="install-header-btn header-bubble-btn" id="install-header-btn" data-pwa-install="header" onclick="promptPwaInstall()" title="安装到桌面" aria-label="安装到桌面" hidden>
+                    <span class="install-btn-icon" aria-hidden="true">
+                        <svg class="install-icon-svg" viewBox="0 0 20 20" fill="none">
+                            <path d="M10 3.5V11.5" />
+                            <path d="M6.5 8.5L10 12L13.5 8.5" />
+                            <path d="M4.5 15.5H15.5" />
+                        </svg>
+                    </span>
+                    <span class="install-btn-text">安装</span>
+                </button>
+                <button class="sync-header-btn header-bubble-btn" id="header-sync-btn" onclick="CloudSync.syncNow()" title="云同步" aria-label="云同步">
                     <span id="header-sync-icon">☁️</span>
                 </button>
-                <button class="settings-btn" onclick="toggleSettings()" title="设置">⚙️</button>
+                <button class="settings-btn header-bubble-btn" onclick="toggleSettings()" title="设置" aria-label="设置">⚙️</button>
             </div>
         </header>
 
@@ -62,36 +78,27 @@
                         </div>
                         <span class="wheel-sep">分</span>
                     </div>
-                    <div class="wheel-group">
-                        <div class="wheel-container" id="second-wheel">
-                            <button class="wheel-btn up" onclick="wheelAdjust('second', 1)">▲</button>
-                            <div class="wheel-display" id="second-display">00</div>
-                            <button class="wheel-btn down" onclick="wheelAdjust('second', -1)">▼</button>
-                        </div>
-                        <span class="wheel-sep">秒</span>
-                    </div>
                 </div>
 
                 <!-- 快捷时间按钮 -->
                 <div class="quick-times">
-                    <button onclick="setQuickTime(30)">30秒</button>
-                    <button onclick="setQuickTime(300)">5分钟</button>
-                    <button onclick="setQuickTime(600)">10分钟</button>
-                    <button onclick="setQuickTime(1800)">30分钟</button>
                     <button onclick="setQuickTime(3600)">1小时</button>
-                    <button onclick="setQuickTime(7200)">2小时</button>
                     <button onclick="setQuickTime(14400)">4小时</button>
                     <button onclick="setQuickTime(28800)">8小时</button>
+                    <button onclick="setQuickTime(43200)">12小时</button>
                 </div>
 
                 <!-- 语音控制 -->
                 <div class="voice-control">
-                    <button class="voice-btn" id="voice-btn" onclick="toggleVoice()">
+                    <button class="voice-btn" id="voice-btn" onclick="toggleVoice()" type="button">
                         <span class="voice-icon">🎤</span>
-                        <span class="voice-text">语音输入</span>
+                        <span class="voice-text">
+                            <strong id="voice-btn-title">语音输入</strong>
+                            <small id="voice-btn-subtitle">点一下说时间</small>
+                        </span>
                     </button>
-                    <p class="voice-hint" id="voice-hint">试试说："30分钟后提醒我"</p>
-                    <div class="voice-result" id="voice-result"></div>
+                    <p class="voice-hint" id="voice-hint">Chrome / Edge，可说“30分钟”或植物名。</p>
+                    <div class="voice-result is-empty" id="voice-result" aria-live="polite"></div>
                 </div>
 
                 <button class="primary-btn" onclick="startTimer()">
@@ -176,46 +183,6 @@
                 </div>
             </div>
 
-            <!-- 截图识别 -->
-            <div class="card">
-                <h2>📸 农场截图识别</h2>
-                <p class="hint-text">上传QQ农场截图，自动识别植物和成熟时间</p>
-                <div class="upload-area" id="upload-area" onclick="document.getElementById('file-input').click()">
-                    <input type="file" id="file-input" accept="image/*" onchange="handleScreenshot(event)" hidden>
-                    <span class="upload-icon">📷</span>
-                    <span>点击上传截图</span>
-                </div>
-                <div class="upload-area" id="paste-area">
-                    <span class="upload-icon">📋</span>
-                    <span>或 Ctrl+V 粘贴截图</span>
-                </div>
-                <div id="screenshot-preview" style="display:none;">
-                    <img id="preview-img" src="" alt="预览">
-                    <div id="ocr-results"></div>
-                </div>
-                
-                <!-- 手动输入识别结果 -->
-                <div class="ocr-manual" id="ocr-manual">
-                    <h3>📝 手动输入植物信息</h3>
-                    <div id="manual-entries">
-                        <div class="manual-entry">
-                            <select class="plant-select" onchange="updateManualEntry()">
-                                <option value="">选择植物</option>
-                            </select>
-                            <span>成熟还需</span>
-                            <input type="number" class="entry-hours" placeholder="时" min="0" max="72" value="0">
-                            <span>时</span>
-                            <input type="number" class="entry-minutes" placeholder="分" min="0" max="59" value="0">
-                            <span>分</span>
-                            <button class="remove-entry" onclick="removeManualEntry(this)">✕</button>
-                        </div>
-                    </div>
-                    <div class="form-actions">
-                        <button class="secondary-btn" onclick="addManualEntry()">+ 添加一行</button>
-                        <button class="primary-btn" onclick="applyManualEntries()">确认并设置闹钟</button>
-                    </div>
-                </div>
-            </div>
         </section>
 
         <!-- 睡前方案页面 -->
@@ -295,6 +262,24 @@
                 </div>
                 <div class="setting-item">
                     <button class="danger-btn" onclick="clearAllAlerts()">🗑️ 清除所有闹钟</button>
+                </div>
+
+                <div class="setting-item pwa-entry">
+                    <div class="setting-row">
+                        <label>📲 安装到桌面</label>
+                        <span class="pwa-badge" id="pwa-install-badge">推荐</span>
+                    </div>
+                    <p class="sync-desc pwa-install-desc" id="pwa-install-hint">安装后可像 App 一样从桌面或主屏幕一键打开。</p>
+                    <button class="secondary-btn install-pwa-btn" id="install-pwa-btn" data-pwa-install="panel" onclick="promptPwaInstall()">
+                        <span class="install-btn-icon" aria-hidden="true">
+                            <svg class="install-icon-svg" viewBox="0 0 20 20" fill="none">
+                                <path d="M10 3.5V11.5" />
+                                <path d="M6.5 8.5L10 12L13.5 8.5" />
+                                <path d="M4.5 15.5H15.5" />
+                            </svg>
+                        </span>
+                        <span class="install-btn-copy">添加到桌面</span>
+                    </button>
                 </div>
 
                 <!-- 云同步设置 -->

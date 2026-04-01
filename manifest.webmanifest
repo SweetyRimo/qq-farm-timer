@@ -1,0 +1,26 @@
+{
+  "name": "QQ农场计时器",
+  "short_name": "农场计时",
+  "description": "支持快速定时、植物种植、睡前方案、云同步与桌面快速打开的 QQ 农场计时器。",
+  "start_url": "./index.html?source=pwa",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f4fff4",
+  "theme_color": "#4CAF50",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
