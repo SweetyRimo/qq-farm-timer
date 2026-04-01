@@ -1,4 +1,4 @@
-const CACHE_NAME = 'qq-farm-timer-pwa-v1';
+const CACHE_NAME = 'qq-farm-timer-pwa-v2';
 const APP_SHELL = [
   './',
   './index.html',
@@ -7,10 +7,10 @@ const APP_SHELL = [
   './plants-data.js',
   './cloud-sync.js',
   './manifest.webmanifest',
-  './icons/icon-32.png',
-  './icons/icon-180.png',
-  './icons/icon-192.png',
-  './icons/icon-512.png'
+  './icons/icon-32-v2.png',
+  './icons/icon-180-v2.png',
+  './icons/icon-192-v2.png',
+  './icons/icon-512-v2.png'
 ];
 
 self.addEventListener('install', (event) => {
