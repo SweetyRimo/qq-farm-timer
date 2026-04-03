@@ -35,6 +35,9 @@
                 <button class="sync-header-btn header-bubble-btn" id="header-sync-btn" onclick="CloudSync.syncNow()" title="云同步" aria-label="云同步">
                     <span id="header-sync-icon">☁️</span>
                 </button>
+                <button class="share-header-btn header-bubble-btn" onclick="showShareDialog()" title="分享给好友" aria-label="分享给好友">
+                    <span>📤</span>
+                </button>
                 <button class="settings-btn header-bubble-btn" onclick="toggleSettings()" title="设置" aria-label="设置">⚙️</button>
             </div>
         </header>
@@ -241,6 +244,35 @@
             </div>
         </section>
 
+
+        <!-- 分享弹窗 -->
+        <div class="modal-overlay" id="share-modal" style="display:none;">
+            <div class="modal share-modal">
+                <h2>📤 分享给好友</h2>
+                <p class="share-intro">把这个好用的农场计时器分享给你的游戏好友吧！</p>
+
+                <div class="share-actions">
+                    <button class="share-btn wechat" onclick="shareToWeChat()">
+                        <span class="share-icon">💬</span>
+                        <span>微信分享</span>
+                    </button>
+                    <button class="share-btn qq" onclick="shareToQQ()">
+                        <span class="share-icon">🐧</span>
+                        <span>QQ分享</span>
+                    </button>
+                </div>
+
+                <div class="share-link-section">
+                    <p class="share-link-label">或者复制链接分享：</p>
+                    <div class="share-link-box">
+                        <input type="text" id="share-link-input" readonly value="https://sweetyrimo.github.io/qq-farm-timer/">
+                        <button class="copy-share-btn" onclick="copyShareLink()">复制</button>
+                    </div>
+                </div>
+
+                <button class="primary-btn" onclick="closeShareDialog()">关闭</button>
+            </div>
+        </div>
 
         <!-- 设置面板 -->
         <div class="modal-overlay" id="settings-modal" style="display:none;">

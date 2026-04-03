@@ -1802,6 +1802,108 @@ body {
     background: rgba(0, 0, 0, 0.25);
 }
 
+/* === 分享弹窗样式 === */
+.share-modal {
+    max-width: 400px;
+}
+
+.share-intro {
+    font-size: 14px;
+    color: var(--text-secondary);
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.share-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.share-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 20px 16px;
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.share-btn:hover {
+    border-color: var(--accent-green);
+    background: var(--bg-primary);
+}
+
+.share-btn.wechat:hover {
+    border-color: #07c160;
+}
+
+.share-btn.qq:hover {
+    border-color: #1296db;
+}
+
+.share-icon {
+    font-size: 32px;
+}
+
+.share-btn span:last-child {
+    font-size: 14px;
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.share-link-section {
+    margin-bottom: 20px;
+}
+
+.share-link-label {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+
+.share-link-box {
+    display: flex;
+    gap: 8px;
+}
+
+.share-link-box input {
+    flex: 1;
+    padding: 10px 12px;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    color: var(--text-secondary);
+    background: var(--bg-primary);
+    cursor: text;
+}
+
+.share-link-box input:focus {
+    outline: none;
+    border-color: var(--accent-green);
+}
+
+.copy-share-btn {
+    padding: 10px 20px;
+    background: var(--accent-green);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.copy-share-btn:hover {
+    background: var(--accent-light);
+}
+
 /* === 响应式 === */
 @media (max-width: 360px) {
     .app-header {

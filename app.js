@@ -2180,7 +2180,13 @@ function syncPwaSessionFlag() {
     const matchedDisplayMode = displayModes.some(mode => window.matchMedia?.(`(display-mode: ${mode})`).matches);
     const iosStandalone = window.navigator.standalone === true;
 
+    // 增强检测：检查是否是 PWA 启动
+    // 1. URL 参数或 referrer
+    // 2. display-mode 媒体查询
+    // 3. iOS standalone 属性
+    // 4. 检查 manifest 的 start_url 是否匹配（sessionStorage 标记）
     const isInstalledContext = launchedFromPwa || launchedFromAndroidApp || matchedDisplayMode || iosStandalone;
+
     if (isInstalledContext) {
         sessionStorage.setItem(PWA_SESSION_FLAG, '1');
     }
@@ -2720,4 +2726,54 @@ async function copyToClipboard(text) {
         }
         document.body.removeChild(textarea);
     }
+}
+
+// ========== 分享功能 ==========
+function showShareDialog() {
+    const modal = document.getElementById('share-modal');
+    if (modal) {
+        modal.style.display = 'flex';
+    }
+}
+
+function closeShareDialog() {
+    const modal = document.getElementById('share-modal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+function copyShareLink() {
+    const shareUrl = 'https://sweetyrimo.github.io/qq-farm-timer/';
+    const shareText = '🌾 QQ农场计时器 - 超好用的农场植物计时工具，再也不用错过收菜时间了！\n\n' + shareUrl;
+    copyToClipboard(shareText);
+}
+
+function shareToWeChat() {
+    const shareUrl = 'https://sweetyrimo.github.io/qq-farm-timer/';
+    const shareText = '🌾 QQ农场计时器 - 超好用的农场植物计时工具，再也不用错过收菜时间了！\n\n' + shareUrl;
+
+    copyToClipboard(shareText);
+
+    showToast('📋 已复制分享文案，打开微信粘贴即可分享！');
+
+    setTimeout(() => {
+        if (isWeChatBrowser()) {
+            showToast('💬 请在微信中使用"分享给朋友"功能');
+        }
+    }, 500);
+}
+
+function shareToQQ() {
+    const shareUrl = 'https://sweetyrimo.github.io/qq-farm-timer/';
+    const shareTitle = 'QQ农场计时器';
+    const shareSummary = '超好用的农场植物计时工具，再也不用错过收菜时间了！';
+
+    copyToClipboard(`${shareTitle}\n${shareSummary}\n${shareUrl}`);
+
+    showToast('📋 已复制分享文案，打开QQ粘贴即可分享！');
+}
+
+function isWeChatBrowser() {
+    return /MicroMessenger/i.test(navigator.userAgent);
 }
