@@ -24,7 +24,6 @@ const CloudSync = {
         const sendKeyInput = document.getElementById('send-key-input');
         const tokenStatus = document.getElementById('token-status');
         const sendkeyStatus = document.getElementById('sendkey-status');
-        const syncIcon = document.getElementById('header-sync-icon');
 
         if (tokenInput && this.token) {
             tokenInput.value = this.token;
@@ -65,16 +64,6 @@ const CloudSync = {
             } else {
                 statusEl.textContent = '☁️ 未连接';
                 statusEl.className = 'sync-status';
-            }
-        }
-        // 更新顶部同步按钮图标状态
-        if (syncIcon) {
-            if (this.token && this.gistId) {
-                syncIcon.textContent = '☁️';
-            } else if (this.token) {
-                syncIcon.textContent = '⏳';
-            } else {
-                syncIcon.textContent = '☁️';
             }
         }
     },
@@ -452,11 +441,6 @@ const CloudSync = {
             return;
         }
 
-        // 顶部按钮动画
-        const syncBtn = document.getElementById('header-sync-btn');
-        const syncIcon = document.getElementById('header-sync-icon');
-        if (syncBtn) syncBtn.classList.add('syncing');
-
         showToast('🔄 正在同步...');
 
         try {
@@ -565,7 +549,7 @@ const CloudSync = {
             if (customCount > 0) parts.push(`${customCount}个自定义植物`);
             showToast(`✅ 同步完成！${parts.join('，')}`);
         } finally {
-            if (syncBtn) syncBtn.classList.remove('syncing');
+            // 移除了顶部同步按钮动画，syncNow()已被移至设置面板
         }
     },
 

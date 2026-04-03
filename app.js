@@ -54,19 +54,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ========== 更新同步状态栏（顶部按钮状态） ==========
 function updateSyncStatusBar() {
-    const syncIcon = document.getElementById('header-sync-icon');
-    if (!syncIcon) return;
-
-    if (CloudSync.token && CloudSync.gistId) {
-        syncIcon.textContent = '☁️';
-        syncIcon.title = '已连接云端，点击同步';
-    } else if (CloudSync.token) {
-        syncIcon.textContent = '⏳';
-        syncIcon.title = '待首次同步，点击同步';
-    } else {
-        syncIcon.textContent = '☁️';
-        syncIcon.title = '未连接（去设置中配置云同步）';
-    }
+    // 云同步按钮已移至设置面板，此函数保留以避免报错
+    return;
 }
 
 function updateStickyOffsets() {
