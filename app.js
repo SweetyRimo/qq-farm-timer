@@ -2201,11 +2201,67 @@ function registerServiceWorker() {
 
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js').then((registration) => {
+            // 监听新版本更新
+            registration.addEventListener('updatefound', () => {
+                const newWorker = registration.installing;
+
+                newWorker.addEventListener('statechange', () => {
+                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                        // 有新版本可用
+                        showUpdateToast();
+                    }
+                });
+            });
+
+            // 监听来自 Service Worker 的消息
+            navigator.serviceWorker.addEventListener('message', (event) => {
+                if (event.data && event.data.type === 'SW_ACTIVATED') {
+                    // 新版本已激活，自动刷新
+                    refreshApp();
+                }
+            });
+
+            // 立即检查更新
             registration.update().catch(() => {});
         }).catch((error) => {
             console.warn('Service Worker 注册失败:', error);
         });
     });
+}
+
+// 显示版本更新提示
+function showUpdateToast() {
+    const toast = document.getElementById('update-toast');
+    if (!toast) return;
+
+    // 防止重复显示
+    if (toast.style.display === 'block') return;
+
+    toast.style.display = 'block';
+    setTimeout(() => toast.classList.add('show'), 10);
+}
+
+// 关闭版本更新提示
+function dismissUpdateToast() {
+    const toast = document.getElementById('update-toast');
+    if (!toast) return;
+
+    toast.classList.remove('show');
+    setTimeout(() => toast.style.display = 'none', 300);
+}
+
+// 刷新应用以应用更新
+function refreshApp() {
+    if (navigator.serviceWorker.controller) {
+        // 通知 Service Worker 跳过等待
+        navigator.serviceWorker.controller.postMessage({
+            type: 'SKIP_WAITING'
+        });
+    }
+    // 延迟刷新确保新 SW 已激活
+    setTimeout(() => {
+        window.location.reload();
+    }, 500);
 }
 
 function isPwaInstalled() {

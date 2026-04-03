@@ -1,4 +1,5 @@
 const CACHE_NAME = 'qq-farm-timer-pwa-v3';
+const APP_VERSION = '1.3.0'; // 应用版本号，每次更新时修改
 const APP_LAUNCH_URL = './index.html?source=pwa';
 const APP_SHELL = [
   './',
@@ -28,6 +29,16 @@ self.addEventListener('activate', (event) => {
     ))
   );
   self.clients.claim();
+
+  // 通知所有客户端新版本已激活
+  self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+    clients.forEach((client) => {
+      client.postMessage({
+        type: 'SW_ACTIVATED',
+        version: APP_VERSION
+      });
+    });
+  });
 });
 
 self.addEventListener('fetch', (event) => {
@@ -65,6 +76,13 @@ self.addEventListener('fetch', (event) => {
       return cached || fetchPromise;
     })
   );
+});
+
+// 处理来自客户端的消息
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener('notificationclick', (event) => {

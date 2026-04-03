@@ -361,6 +361,16 @@
         </div>
     </div>
 
+    <!-- 版本更新提示 -->
+    <div class="toast toast-update" id="update-toast" style="display:none;">
+        <div class="toast-content">
+            <span class="toast-icon">🆕</span>
+            <span class="toast-message">发现新版本，点击刷新获取最新功能</span>
+            <button class="toast-action" onclick="refreshApp()">刷新</button>
+        </div>
+        <button class="toast-close" onclick="dismissUpdateToast()">✕</button>
+    </div>
+
     <!-- 分析帮助弹窗 -->
     <div class="modal-overlay" id="analysis-help-modal" style="display:none;">
         <div class="modal help-modal">
