@@ -41,6 +41,9 @@ document.addEventListener('DOMContentLoaded', () => {
     selectLand(state.selectedLand || 'gold');
     updateStickyOffsets();
 
+    // 初始化分析页面
+    selectAnalysisLand(analysisState.selectedLand || 'gold');
+
     window.addEventListener('resize', updateStickyOffsets);
 
     // 每秒更新运行中的定时器显示
@@ -2378,3 +2381,211 @@ document.addEventListener('click', (e) => {
         toggleSettings();
     }
 });
+
+// ========== 分析页面相关功能 ==========
+let analysisState = {
+    farmLevel: 1,
+    selectedLand: 'gold',
+    sortBy: 'income',
+    results: []
+};
+
+// 更新农场等级
+function updateFarmLevel(level) {
+    level = parseInt(level);
+    if (isNaN(level) || level < 1) level = 1;
+    if (level > 140) level = 140;
+
+    analysisState.farmLevel = level;
+
+    // 更新提示文本
+    const hintText = document.getElementById('plant-count-hint');
+    if (hintText) {
+        const unlockedCount = Object.values(PLANTS_DATABASE).filter(p => p.level <= level).length;
+        const totalCount = Object.keys(PLANTS_DATABASE).length;
+        hintText.textContent = `已解锁 ${unlockedCount}/${totalCount} 种植物`;
+    }
+
+    // 自动计算效率（按总收益排序）
+    calculateEfficiency();
+}
+
+// 调整农场等级
+function adjustLevel(delta) {
+    const input = document.getElementById('farm-level-input');
+    let level = parseInt(input.value) || 1;
+    level += delta;
+    if (level < 1) level = 1;
+    if (level > 140) level = 140;
+    input.value = level;
+    updateFarmLevel(level);
+}
+
+// 选择分析页面的土地类型
+function selectAnalysisLand(landType) {
+    analysisState.selectedLand = landType;
+
+    // 更新按钮状态
+    const btns = document.querySelectorAll('#analysis-land-options .land-btn');
+    btns.forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.land === landType);
+    });
+
+    // 如果已有结果，重新计算
+    if (analysisState.results.length > 0) {
+        calculateEfficiency();
+    }
+}
+
+// 计算效率
+function calculateEfficiency() {
+    const land = LAND_TYPES[analysisState.selectedLand];
+    if (!land) return;
+
+    // 过滤出当前等级解锁且可在该土地种植的植物
+    const plants = Object.values(PLANTS_DATABASE)
+        .filter(p => p.level <= analysisState.farmLevel)
+        .filter(p => canPlantOnLand(p, analysisState.selectedLand))
+        .map(plant => {
+            // 计算各数据
+            const growTime = calcGrowTime(plant.name, analysisState.selectedLand);
+            const totalTime = calcTotalGrowTime(plant.name, analysisState.selectedLand);
+            const sellPrice = Math.round(plant.sellPrice * (1 + land.yieldBonus));
+
+            // 计算收益和经验
+            const profit = sellPrice - plant.seedPrice;
+            const totalProfit = profit * plant.seasons;
+            const totalExp = plant.exp * plant.seasons;
+
+            // 计算每小时效率
+            const incomePerHour = totalTime > 0 ? totalProfit / totalTime : 0;
+            const expPerHour = totalTime > 0 ? totalExp / totalTime : 0;
+
+            return {
+                ...plant,
+                growTime,
+                totalTime,
+                sellPrice,
+                profit,
+                totalProfit,
+                totalExp,
+                incomePerHour,
+                expPerHour
+            };
+        });
+
+    analysisState.results = plants;
+
+    // 默认按总收益排序
+    if (analysisState.results.length > 0) {
+        const sortBy = document.getElementById('analysis-sort').value;
+        sortAnalysisResults();
+    }
+}
+
+// 排序结果
+function sortAnalysisResults() {
+    const sortBy = document.getElementById('analysis-sort').value;
+    analysisState.sortBy = sortBy;
+
+    // 根据选择排序
+    let sortedResults = [...analysisState.results];
+
+    switch(sortBy) {
+        case 'income':
+            sortedResults.sort((a, b) => b.incomePerHour - a.incomePerHour);
+            break;
+        case 'exp':
+            sortedResults.sort((a, b) => b.expPerHour - a.expPerHour);
+            break;
+        case 'totalIncome':
+            sortedResults.sort((a, b) => b.totalProfit - a.totalProfit);
+            break;
+        case 'totalExp':
+            sortedResults.sort((a, b) => b.totalExp - a.totalExp);
+            break;
+        case 'time':
+            sortedResults.sort((a, b) => a.growTime - b.growTime);
+            break;
+    }
+
+    renderAnalysisResults(sortedResults);
+}
+
+// 渲染分析结果
+function renderAnalysisResults(results) {
+    const resultDiv = document.getElementById('analysis-result');
+    const summaryDiv = document.getElementById('analysis-summary');
+    const listDiv = document.getElementById('efficiency-plant-list');
+
+    if (!resultDiv || !summaryDiv || !listDiv) return;
+
+    resultDiv.style.display = 'block';
+
+    // 计算汇总信息
+    const topIncome = results[0];
+    const topExp = [...results].sort((a, b) => b.expPerHour - a.expPerHour)[0];
+
+    summaryDiv.innerHTML = `
+        <div class="summary-item">
+            <span class="summary-label">🏆 最高收益</span>
+            <span class="summary-value">${topIncome.emoji} ${topIncome.name}</span>
+            <span class="summary-sub">${topIncome.incomePerHour.toFixed(1)}/h</span>
+        </div>
+        <div class="summary-divider"></div>
+        <div class="summary-item">
+            <span class="summary-label">⭐ 最高经验</span>
+            <span class="summary-value">${topExp.emoji} ${topExp.name}</span>
+            <span class="summary-sub">${topExp.expPerHour.toFixed(1)}/h</span>
+        </div>
+    `;
+
+    // 渲染植物列表
+    listDiv.innerHTML = results.map((plant, index) => {
+        const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '';
+        const seasonsText = plant.seasons > 1 ? `<span class="plant-seasons">${plant.seasons}季</span>` : '';
+
+        return `
+            <div class="analysis-plant-card" onclick="startPlantTimer('${plant.name}', '${analysisState.selectedLand}')">
+                <div class="analysis-plant-rank">${medal || (index + 1)}</div>
+                <div class="analysis-plant-emoji">${plant.emoji}</div>
+                <div class="analysis-plant-info">
+                    <div class="analysis-plant-name">${plant.name} ${seasonsText}</div>
+                    <div class="analysis-plant-time">${plant.growTime}h · ${plant.totalTime}h</div>
+                </div>
+                <div class="analysis-plant-stats">
+                    <div class="stat-item income">
+                        <span class="stat-value">${plant.incomePerHour.toFixed(0)}</span>
+                        <span class="stat-label">收益/h</span>
+                    </div>
+                    <div class="stat-item exp">
+                        <span class="stat-value">${plant.expPerHour.toFixed(0)}</span>
+                        <span class="stat-label">经验/h</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    // 只在首次计算时显示 toast
+    if (!analysisState.hasCalculated) {
+        showToast(`📊 已计算 ${results.length} 种植物的效率数据`);
+        analysisState.hasCalculated = true;
+    }
+}
+
+// 显示分析帮助
+function showAnalysisHelp() {
+    const modal = document.getElementById('analysis-help-modal');
+    if (modal) {
+        modal.style.display = 'flex';
+    }
+}
+
+// 关闭分析帮助
+function closeAnalysisHelp() {
+    const modal = document.getElementById('analysis-help-modal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}

@@ -43,7 +43,7 @@
         <nav class="tab-nav">
             <button class="tab-btn active" data-tab="timer" onclick="switchTab('timer')">⏰ 定时</button>
             <button class="tab-btn" data-tab="plant" onclick="switchTab('plant')">🌱 种植</button>
-            <button class="tab-btn" data-tab="sleep" onclick="switchTab('sleep')">🧮 方案计算</button>
+            <button class="tab-btn" data-tab="analysis" onclick="switchTab('analysis')">📊 效率</button>
         </nav>
 
         <!-- 背景装饰粒子 -->
@@ -182,45 +182,61 @@
 
         </section>
 
-        <!-- 睡前方案页面 -->
-        <section id="tab-sleep" class="tab-content">
+        <!-- 分析页面 -->
+        <section id="tab-analysis" class="tab-content">
             <div class="card">
-                <h2>😴 睡前种植方案</h2>
-                <p class="hint-text">根据你的起床时间，计算睡前种什么植物最合适，确保起床后刚好可以收菜！</p>
-                
-                <div class="sleep-form">
-                    <div class="form-row">
-                        <label>预计入睡时间</label>
-                        <input type="time" id="sleep-time" value="23:30">
+                <h2>📊 收益/经验效率</h2>
+                <p class="hint-text">查看不同作物的每小时收益和经验，帮助你选择最优种植方案！</p>
+
+                <!-- 农场等级选择 -->
+                <div class="farm-level-selector">
+                    <div class="level-header">
+                        <label for="farm-level-input">当前农场等级</label>
                     </div>
-                    <div class="form-row">
-                        <label>预计起床时间</label>
-                        <input type="time" id="wake-time" value="07:30">
-                    </div>
-                    <div class="form-row">
-                        <label>可种植地块数</label>
-                        <div class="counter">
-                            <button onclick="adjustCount('plot-count', -1)">−</button>
-                            <input type="number" id="plot-count" value="6" min="1" max="24">
-                            <button onclick="adjustCount('plot-count', 1)">+</button>
+                    <div class="level-input-wrapper">
+                        <input type="number" id="farm-level-input" value="1" min="1" max="140" step="1" onchange="updateFarmLevel(this.value)" oninput="updateFarmLevel(this.value)">
+                        <div class="level-buttons">
+                            <button class="level-btn" onclick="adjustLevel(-1)">−</button>
+                            <button class="level-btn" onclick="adjustLevel(1)">+</button>
                         </div>
                     </div>
-                    <div class="form-row">
-                        <label>已种植地块（睡觉期间已成熟）</label>
-                        <div class="counter">
-                            <button onclick="adjustCount('existing-plots', -1)">−</button>
-                            <input type="number" id="existing-plots" value="2" min="0" max="24">
-                            <button onclick="adjustCount('existing-plots', 1)">+</button>
+                    <span class="hint-text" id="plant-count-hint">显示所有植物</span>
+                </div>
+
+                <!-- 土地类型和排序选择 -->
+                <div class="analysis-controls">
+                    <div class="control-group">
+                        <label>土地类型：</label>
+                        <div class="land-options" id="analysis-land-options">
+                            <button class="land-btn" data-land="normal" onclick="selectAnalysisLand('normal')">🟫 普通</button>
+                            <button class="land-btn" data-land="red" onclick="selectAnalysisLand('red')">🔴 红土</button>
+                            <button class="land-btn" data-land="black" onclick="selectAnalysisLand('black')">⬛ 黑土</button>
+                            <button class="land-btn" data-land="gold" onclick="selectAnalysisLand('gold')">🟡 金土</button>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label>排序方式：</label>
+                        <div class="sort-controls">
+                            <select id="analysis-sort" onchange="sortAnalysisResults()">
+                                <option value="income">每小时收益 ↓</option>
+                                <option value="exp">每小时经验 ↓</option>
+                                <option value="totalIncome">总收益 ↓</option>
+                                <option value="totalExp">总经验 ↓</option>
+                                <option value="time">成熟时间 ↑</option>
+                            </select>
+                            <button class="help-btn" onclick="showAnalysisHelp()" title="查看计算说明">❓</button>
                         </div>
                     </div>
                 </div>
 
-                <button class="primary-btn" onclick="calculateSleepPlan()">
-                    🧮 计算最佳方案
-                </button>
-
-                <div id="sleep-plan-result" class="sleep-plan-result" style="display:none;">
-                    <!-- 动态生成 -->
+                <!-- 分析结果 -->
+                <div id="analysis-result" class="analysis-result" style="display:none;">
+                    <div class="analysis-summary" id="analysis-summary">
+                        <!-- 动态生成 -->
+                    </div>
+                    <div class="plant-list" id="efficiency-plant-list">
+                        <!-- 动态生成 -->
+                    </div>
                 </div>
             </div>
         </section>
@@ -342,6 +358,59 @@
             <h2>收菜时间到！</h2>
             <p id="alarm-message"></p>
             <button class="primary-btn alarm-dismiss" onclick="dismissAlarm()">我知道了</button>
+        </div>
+    </div>
+
+    <!-- 分析帮助弹窗 -->
+    <div class="modal-overlay" id="analysis-help-modal" style="display:none;">
+        <div class="modal help-modal">
+            <h2>📊 效率说明</h2>
+            <div class="help-content">
+                <div class="help-section">
+                    <h3>💰 每小时收益/经验</h3>
+                    <p><strong>每小时收益</strong>：作物每小时的利润。利润 = 售价 - 种子成本。</p>
+                    <p><strong>每小时经验</strong>：作物每小时获得的经验值。经验用于提升农场等级。</p>
+                    <p class="formula">每小时收益 = (售价 - 种子成本) × 季数 ÷ 总成熟时间</p>
+                    <p class="formula">每小时经验 = 经验 × 季数 ÷ 总成熟时间</p>
+                </div>
+                <div class="help-divider"></div>
+                <div class="help-section">
+                    <h3>📈 总收益/经验</h3>
+                    <p><strong>总收益</strong>：作物<strong>全部收获</strong>后的总利润（多季作物会累加）。</p>
+                    <p><strong>总经验</strong>：作物<strong>全部收获</strong>后获得的总经验。</p>
+                    <p class="formula">总收益 = (售价 - 种子成本) × 季数</p>
+                    <p class="formula">总经验 = 经验 × 季数</p>
+                </div>
+                <div class="help-divider"></div>
+                <div class="help-section">
+                    <h3>⏱️ 成熟时间</h3>
+                    <p>作物从播种到<strong>全部收获完成</strong>所需的时间。</p>
+                    <p>多季作物的成熟时间是所有季数的总和，不同土地类型会影响成熟时间。</p>
+                    <p class="formula">总成熟时间 = 首季时间 + 再熟时间 × (季数 - 1)</p>
+                </div>
+                <div class="help-divider"></div>
+                <div class="help-section">
+                    <h3>💡 土地加成</h3>
+                    <p>不同土地对作物有不同影响：</p>
+                    <ul>
+                        <li><strong>🟫 普通土地</strong>：无加成</li>
+                        <li><strong>🔴 红土地</strong>：增产+10%</li>
+                        <li><strong>⬛ 黑土地</strong>：增产+20% · 成熟时间-20%</li>
+                        <li><strong>🟡 金土地</strong>：增产+28% · 成熟时间-20%</li>
+                    </ul>
+                </div>
+                <div class="help-divider"></div>
+                <div class="help-section">
+                    <h3>🎯 使用建议</h3>
+                    <ul>
+                        <li>想要<strong>快速赚钱</strong>：按"每小时收益"排序，选择前几名</li>
+                        <li>想要<strong>快速升级</strong>：按"每小时经验"排序，选择前几名</li>
+                        <li>想要<strong>最大化收益</strong>：按"总收益"排序，选择高价值作物</li>
+                        <li><strong>低级玩家</strong>：先升级土地，再考虑高价值作物</li>
+                    </ul>
+                </div>
+            </div>
+            <button class="primary-btn" onclick="closeAnalysisHelp()">知道了</button>
         </div>
     </div>
 
