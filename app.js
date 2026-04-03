@@ -441,12 +441,12 @@ function setVoiceResult(message = '', type = 'info') {
 
 function mapVoiceError(error) {
     const errorMap = {
-        'not-allowed': '麦克风权限被拒绝了，请先允许浏览器使用麦克风。',
+        'not-allowed': '麦克风权限被拒绝了，请在浏览器设置中允许使用麦克风。',
         'service-not-allowed': '当前浏览器禁止了语音识别服务，请换 Chrome / Edge 再试。',
         'no-speech': '没有听到有效语音，请靠近麦克风后再试。',
         'audio-capture': '没有检测到可用麦克风设备。',
         'network': '语音识别服务连接失败，请检查网络后重试。',
-        'aborted': '语音识别已中断，请再试一次。'
+        'aborted': '语音识别已中断。可能原因：页面失去焦点、麦克风被占用或浏览器限制。请重试。'
     };
 
     return errorMap[error] || '语音识别失败了，请稍后重试。';
@@ -603,7 +603,7 @@ function toggleVoice() {
         state.recognition.start();
     } catch (error) {
         console.error('语音识别启动失败:', error);
-        setVoiceResult('语音识别启动失败，请稍后重试。', 'error');
+        setVoiceResult('语音识别启动失败。提示：请确保麦克风未被其他应用占用。', 'error');
         showToast('语音识别启动失败，请重试');
     }
 }
@@ -2515,6 +2515,17 @@ document.addEventListener('visibilitychange', () => {
             }
         });
         cleanupExpiredAlerts();
+    } else {
+        // 页面失去焦点时，优雅停止语音识别
+        if (state.voiceActive && state.recognition) {
+            voiceSession.stopReason = 'manual-stop';
+            clearVoiceAutoStop();
+            try {
+                state.recognition.stop();
+            } catch (e) {
+                // 忽略停止时的错误
+            }
+        }
     }
 });
 
