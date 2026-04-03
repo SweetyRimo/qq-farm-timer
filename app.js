@@ -775,7 +775,10 @@ function startPlantTimer(plantName, preferredLandType = null) {
             const totalSeconds = Math.round(growTime * 3600);
             const id = 'timer_' + Date.now();
             const endTimeISO = new Date(Date.now() + totalSeconds * 1000);
-            
+
+            // 获取各季成熟时间
+            const seasonTimes = getSeasonTimes(plantName, landType);
+
             const timer = {
                 id,
                 endTime: endTimeISO.toISOString(),
@@ -784,15 +787,18 @@ function startPlantTimer(plantName, preferredLandType = null) {
                 label: `${plant.emoji} ${plant.name} (${land.emoji}${growTime}h)`,
                 plant: plantName,
                 land: landType,
-                createdAt: new Date().toISOString()
+                createdAt: new Date().toISOString(),
+                seasons: plant.seasons || 1,
+                currentSeason: 1,
+                seasonTimes: seasonTimes
             };
-            
+
             state.timers[id] = timer;
             state.alerts.push(timer);
             saveState();
             renderRunningTimers();
             renderAlertsList();
-            
+
             showToast(`🌱 ${plant.name}已种在${land.emoji}${land.name}！${growTime}小时后（${endStr}）提醒收菜`);
         }
     );
@@ -947,9 +953,40 @@ function triggerAlarm(timer) {
     triggeredAlarmIds.add(timer.id);
 
     const triggeredAt = new Date().toISOString();
-    const message = timer.plant
-        ? `${PLANTS_DATABASE[timer.plant]?.emoji || '🌱'} ${timer.plant || '植物'}成熟了！快去收菜！`
+    const plant = timer.plant ? PLANTS_DATABASE[timer.plant] : null;
+    const message = plant
+        ? `${plant?.emoji || '🌱'} ${timer.plant || '植物'}成熟了！快去收菜！`
         : `⏰ 定时结束！${timer.label}`;
+
+    // 检查是否为多季作物，且当前季还未到最后一季
+    if (timer.seasons > 1 && timer.currentSeason < timer.seasons) {
+        const nextSeason = timer.currentSeason + 1;
+
+        // 获取下一季的成熟时间
+        if (timer.seasonTimes && timer.seasonTimes[nextSeason - 1]) {
+            const nextSeasonHours = timer.seasonTimes[nextSeason - 1];
+            const nextSeasonSeconds = Math.round(nextSeasonHours * 3600);
+            const nextEndTimeISO = new Date(Date.now() + nextSeasonSeconds * 1000);
+
+            // 创建下一季的闹钟
+            const nextTimer = {
+                id: 'timer_' + Date.now(),
+                endTime: nextEndTimeISO.toISOString(),
+                totalSeconds: nextSeasonSeconds,
+                remainingSeconds: nextSeasonSeconds,
+                label: `${plant?.emoji || '🌱'} ${timer.plant || '植物'} 第${nextSeason}季 (${timer.land ? LAND_TYPES[timer.land]?.emoji : ''}${nextSeasonHours}h)`,
+                plant: timer.plant,
+                land: timer.land,
+                createdAt: new Date().toISOString(),
+                seasons: timer.seasons,
+                currentSeason: nextSeason,
+                seasonTimes: timer.seasonTimes
+            };
+
+            state.timers[nextTimer.id] = nextTimer;
+            state.alerts.push(nextTimer);
+        }
+    }
 
     // 写入历史记录并从当前闹钟中移除
     archiveAlertToHistory(timer, triggeredAt);
