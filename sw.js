@@ -1,5 +1,5 @@
-const CACHE_NAME = 'qq-farm-timer-pwa-v3';
-const APP_VERSION = '1.3.0'; // 应用版本号，每次更新时修改
+const CACHE_NAME = 'qq-farm-timer-pwa-v4';
+const APP_VERSION = '1.4.0'; // 应用版本号，每次更新时修改
 const APP_LAUNCH_URL = './index.html?source=pwa';
 const APP_SHELL = [
   './',
@@ -17,6 +17,7 @@ const APP_SHELL = [
 
 // 后台闹钟检查定时器
 let alarmCheckInterval = null;
+let swAlarms = {}; // Service Worker 存储的闹钟数据
 const ALARM_CHECK_INTERVAL = 10000; // 每10秒检查一次（后台模式）
 
 self.addEventListener('install', (event) => {
@@ -64,7 +65,44 @@ function startBackgroundAlarmCheck() {
 // 后台检查闹钟
 async function checkAlarmsInBackground() {
   try {
-    // 通知所有客户端检查闹钟
+    const now = Date.now();
+    let triggeredCount = 0;
+
+    // Service Worker 独立检查存储的闹钟
+    Object.keys(swAlarms).forEach(id => {
+      const alarm = swAlarms[id];
+      if (alarm && new Date(alarm.endTime).getTime() <= now) {
+        // 闹钟到期，触发通知
+        console.log('[Service Worker] 检测到到期闹钟:', alarm.label);
+
+        const options = {
+          body: `${alarm.label}成熟了！快去收菜！`,
+          icon: './icons/icon-192-v2.png',
+          badge: './icons/icon-32-v2.png',
+          requireInteraction: true,
+          renotify: true,
+          tag: `farm-alarm-${id}`,
+          data: {
+            alarmId: id,
+            url: './index.html?source=pwa'
+          }
+        };
+
+        self.registration.showNotification('🌾 农场收菜提醒', options)
+          .then(() => {
+            console.log('[Service Worker] 后台通知发送成功');
+            triggeredCount++;
+          })
+          .catch((error) => {
+            console.error('[Service Worker] 后台通知发送失败:', error);
+          });
+
+        // 删除已触发的闹钟
+        delete swAlarms[id];
+      }
+    });
+
+    // 同时通知所有客户端检查闹钟（双重保障）
     const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     if (clients.length > 0) {
       clients.forEach((client) => {
@@ -72,6 +110,8 @@ async function checkAlarmsInBackground() {
           type: 'CHECK_ALARMS'
         });
       });
+    } else {
+      console.log('[Service Worker] 没有活跃的客户端，独立检查了', triggeredCount, '个闹钟');
     }
   } catch (error) {
     console.error('[Service Worker] 检查闹钟失败:', error);
@@ -119,6 +159,16 @@ self.addEventListener('fetch', (event) => {
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
+  }
+  if (event.data && event.data.type === 'SYNC_ALARMS') {
+    // 同步闹钟数据到 Service Worker
+    swAlarms = {};
+    if (event.data.alarms && Array.isArray(event.data.alarms)) {
+      event.data.alarms.forEach(alarm => {
+        swAlarms[alarm.id] = alarm;
+      });
+      console.log('[Service Worker] 闹钟数据已同步:', Object.keys(swAlarms).length, '个闹钟');
+    }
   }
   if (event.data && event.data.type === 'SHOW_NOTIFICATION') {
     const { title, options } = event.data;

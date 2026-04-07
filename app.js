@@ -410,9 +410,12 @@ function startTimer() {
     saveState();
     renderRunningTimers();
     renderAlertsList();
-    
+
+    // 同步闹钟到 Service Worker（用于后台检查）
+    syncAlarmsToServiceWorker();
+
     showToast(`⏰ 定时器已启动：${timer.label}`);
-    
+
     // 重置时间选择器
     setQuickTime(0);
 }
@@ -499,6 +502,9 @@ function startPlantTimer(plantName, preferredLandType = null) {
             renderRunningTimers();
             renderAlertsList();
 
+            // 同步闹钟到 Service Worker（用于后台检查）
+            syncAlarmsToServiceWorker();
+
             showToast(`🌱 ${plant.name}已种在${land.emoji}${land.name}！${growTime}小时后（${endStr}）提醒收菜`);
         }
     );
@@ -510,6 +516,10 @@ function cancelTimer(id) {
     saveState();
     renderRunningTimers();
     renderAlertsList();
+
+    // 同步闹钟到 Service Worker（用于后台检查）
+    syncAlarmsToServiceWorker();
+
     showToast('已取消定时器');
 }
 
@@ -2255,6 +2265,27 @@ function showConfirm(title, message, onConfirm) {
     overlay.addEventListener('click', (e) => {
         if (e.target === overlay) overlay.remove();
     });
+}
+
+// 同步闹钟数据到 Service Worker
+async function syncAlarmsToServiceWorker() {
+    try {
+        const registration = await navigator.serviceWorker?.getRegistration?.();
+        if (registration?.active) {
+            const alarmData = Object.values(state.timers).map(timer => ({
+                id: timer.id,
+                endTime: timer.endTime,
+                label: timer.label
+            }));
+
+            registration.active.postMessage({
+                type: 'SYNC_ALARMS',
+                alarms: alarmData
+            });
+        }
+    } catch (error) {
+        console.warn('[Service Worker] 同步闹钟数据失败:', error);
+    }
 }
 
 // ========== 页面可见性恢复时刷新 ==========
