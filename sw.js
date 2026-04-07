@@ -15,6 +15,10 @@ const APP_SHELL = [
   './icons/icon-512-v2.png'
 ];
 
+// 后台闹钟检查定时器
+let alarmCheckInterval = null;
+const ALARM_CHECK_INTERVAL = 10000; // 每10秒检查一次（后台模式）
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL))
@@ -30,6 +34,9 @@ self.addEventListener('activate', (event) => {
   );
   self.clients.claim();
 
+  // 启动后台闹钟检查
+  startBackgroundAlarmCheck();
+
   // 通知所有客户端新版本已激活
   self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
     clients.forEach((client) => {
@@ -40,6 +47,36 @@ self.addEventListener('activate', (event) => {
     });
   });
 });
+
+// 启动后台闹钟检查
+function startBackgroundAlarmCheck() {
+  if (alarmCheckInterval) {
+    clearInterval(alarmCheckInterval);
+  }
+
+  alarmCheckInterval = setInterval(() => {
+    checkAlarmsInBackground();
+  }, ALARM_CHECK_INTERVAL);
+
+  console.log('[Service Worker] 后台闹钟检查已启动');
+}
+
+// 后台检查闹钟
+async function checkAlarmsInBackground() {
+  try {
+    // 通知所有客户端检查闹钟
+    const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    if (clients.length > 0) {
+      clients.forEach((client) => {
+        client.postMessage({
+          type: 'CHECK_ALARMS'
+        });
+      });
+    }
+  } catch (error) {
+    console.error('[Service Worker] 检查闹钟失败:', error);
+  }
+}
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;

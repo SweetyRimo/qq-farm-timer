@@ -828,14 +828,19 @@ function renderRunningTimers() {
 // ========== 定时器循环检查 ==========
 function startTimerLoop() {
     setInterval(() => {
-        const now = Date.now();
-        Object.keys(state.timers).forEach(id => {
-            const timer = state.timers[id];
-            if (timer && new Date(timer.endTime) <= new Date(now)) {
-                triggerAlarm(timer);
-            }
-        });
+        checkAlarmsNow();
     }, 1000);
+}
+
+// 立即检查闹钟（由前台定时器和Service Worker调用）
+function checkAlarmsNow() {
+    const now = Date.now();
+    Object.keys(state.timers).forEach(id => {
+        const timer = state.timers[id];
+        if (timer && new Date(timer.endTime) <= new Date(now)) {
+            triggerAlarm(timer);
+        }
+    });
 }
 
 // ========== 闹钟触发 ==========
@@ -2334,6 +2339,9 @@ function registerServiceWorker() {
                 if (event.data && event.data.type === 'SW_ACTIVATED') {
                     // 新版本已激活，自动刷新
                     refreshApp();
+                } else if (event.data && event.data.type === 'CHECK_ALARMS') {
+                    // Service Worker 要求检查闹钟
+                    checkAlarmsNow();
                 }
             });
 
