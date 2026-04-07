@@ -122,7 +122,25 @@ self.addEventListener('message', (event) => {
   }
   if (event.data && event.data.type === 'SHOW_NOTIFICATION') {
     const { title, options } = event.data;
-    self.registration.showNotification(title, options);
+    console.log('[Service Worker] 收到通知请求:', { title, options });
+
+    self.registration.showNotification(title, options)
+      .then(() => {
+        console.log('[Service Worker] 通知发送成功');
+
+        // 发送成功确认响应
+        if (event.ports && event.ports[0]) {
+          event.ports[0].postMessage({ ok: true, channel: 'service-worker' });
+        }
+      })
+      .catch((error) => {
+        console.error('[Service Worker] 通知发送失败:', error);
+
+        // 发送失败确认响应
+        if (event.ports && event.ports[0]) {
+          event.ports[0].postMessage({ ok: false, reason: error.message || 'notification-failed' });
+        }
+      });
   }
 });
 

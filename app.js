@@ -609,13 +609,41 @@ async function sendBrowserAlarmNotification(timer, message) {
 
         if (registration?.active) {
             console.log('[通知] 使用 Service Worker 发送通知');
-            registration.active.postMessage({
-                type: 'SHOW_NOTIFICATION',
-                title: '🌾 农场收菜提醒',
-                options: options
-            });
-            console.log('[通知] Service Worker 通知消息已发送');
-            return { ok: true, channel: 'service-worker-message' };
+
+            try {
+                // 创建消息通道接收 Service Worker 的确认
+                const channel = new MessageChannel();
+                const resultPromise = new Promise((resolve, reject) => {
+                    const timeout = setTimeout(() => {
+                        resolve({ ok: false, reason: 'timeout' });
+                    }, 3000); // 3秒超时
+
+                    channel.port1.onmessage = (event) => {
+                        clearTimeout(timeout);
+                        resolve(event.data);
+                    };
+                });
+
+                registration.active.postMessage({
+                    type: 'SHOW_NOTIFICATION',
+                    title: '🌾 农场收菜提醒',
+                    options: options
+                }, [channel.port2]);
+
+                console.log('[通知] Service Worker 通知消息已发送，等待确认...');
+                const result = await resultPromise;
+                console.log('[通知] Service Worker 确认结果:', result);
+
+                if (result.ok) {
+                    return { ok: true, channel: 'service-worker-message' };
+                } else {
+                    console.warn('[通知] Service Worker 通知失败:', result);
+                    throw new Error(result.reason || 'Service Worker 通知失败');
+                }
+            } catch (error) {
+                console.warn('[通知] Service Worker 通知发送失败:', error);
+                // 继续尝试页面通知
+            }
         } else {
             console.log('[通知] Service Worker 不可用，准备使用页面通知');
         }
