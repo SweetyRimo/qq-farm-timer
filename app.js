@@ -465,6 +465,7 @@ function startPlantTimer(plantName, preferredLandType = null) {
         ${yieldBonus}${timeBonus}
         ${seasonsInfo}`,
         () => {
+            // 使用首季时间，依靠 triggerAlarm 中的多季作物自动续季逻辑
             const totalSeconds = Math.round(growTime * 3600);
             const id = 'timer_' + Date.now();
             const endTimeISO = new Date(Date.now() + totalSeconds * 1000);
@@ -492,6 +493,7 @@ function startPlantTimer(plantName, preferredLandType = null) {
                 land: landType,
                 seasons: timer.seasons,
                 seasonTimes: timer.seasonTimes,
+                currentSeason: timer.currentSeason,
                 firstSeasonTime: growTime,
                 totalSeconds: timer.totalSeconds
             });
@@ -1980,6 +1982,8 @@ function showNotificationGuideModal(options = {}) {
 let deferredInstallPrompt = null;
 let pwaInstallReady = false;
 const PWA_SESSION_FLAG = 'farm-pwa-session';
+const PWA_INSTALL_VER_KEY = 'farm-pwa-install-ver';
+const PWA_VERSION = '1.4.0'; // 应用版本号，需与 sw.js 保持一致
 
 function syncPwaSessionFlag() {
     const launchedFromPwa = new URLSearchParams(window.location.search).get('source') === 'pwa';
@@ -2005,6 +2009,7 @@ function syncPwaSessionFlag() {
 function initPWA() {
     registerServiceWorker();
     syncPwaSessionFlag();
+    checkPwaVersion(); // 检查 PWA 版本
     updatePwaInstallUI();
 
     window.addEventListener('beforeinstallprompt', (event) => {
@@ -2019,6 +2024,7 @@ function initPWA() {
         deferredInstallPrompt = null;
         pwaInstallReady = false;
         sessionStorage.setItem(PWA_SESSION_FLAG, '1');
+        localStorage.setItem(PWA_INSTALL_VER_KEY, PWA_VERSION); // 保存安装版本
         clearNotifyGuideDismissal();
         updatePwaInstallUI(true);
         showToast('✅ 已安装到桌面，可像 App 一样快速打开');
@@ -2102,6 +2108,34 @@ function dismissUpdateToast() {
 
     toast.classList.remove('show');
     setTimeout(() => toast.style.display = 'none', 300);
+}
+
+// 关闭 PWA 重新安装提示
+function dismissPwaReinstallToast() {
+    const toast = document.getElementById('pwa-reinstall-toast');
+    if (!toast) return;
+
+    toast.classList.remove('show');
+    setTimeout(() => toast.style.display = 'none', 300);
+}
+
+// 检查 PWA 版本
+function checkPwaVersion() {
+    // 只在 PWA 环境下检查
+    if (!isPwaInstalled()) return;
+
+    const installedVersion = localStorage.getItem(PWA_INSTALL_VER_KEY);
+    const currentVersion = PWA_VERSION;
+
+    // 如果版本不匹配，显示重新安装提示
+    if (installedVersion && installedVersion !== currentVersion) {
+        console.log(`[PWA] 版本不匹配: 已安装 ${installedVersion}, 当前 ${currentVersion}`);
+        const toast = document.getElementById('pwa-reinstall-toast');
+        if (toast) {
+            toast.style.display = 'block';
+            setTimeout(() => toast.classList.add('show'), 10);
+        }
+    }
 }
 
 // 刷新应用以应用更新

@@ -315,6 +315,7 @@
                         用 GitHub 登录后获取 SendKey
                     </p>
                     <p class="config-hint">"测试推送"会直接用当前设备保存的 SendKey 发送；闹钟到点时现在会优先由当前页面直发微信，后台定时任务继续兜底补发。</p>
+                    <p class="config-hint" style="color: #f57c00;">⚠️ Server酱免费版每天限推送5次，超过后当日将无法收到微信消息。</p>
                 </div>
 
                 <div class="setting-item config-transfer-entry">
@@ -334,6 +335,15 @@
                     <button class="primary-btn" onclick="CloudSync.saveConfig()" style="font-size:14px;padding:10px;">💾 保存配置</button>
                     <button class="secondary-btn" onclick="CloudSync.syncNow()" style="font-size:14px;padding:10px;">🔄 立即同步</button>
                     <button class="secondary-btn" onclick="CloudSync.testPush()" style="font-size:14px;padding:10px;">📡 测试推送</button>
+                </div>
+
+                <div class="setting-item" style="border-top:1px solid #ddd; padding-top:15px; margin-top:15px;">
+                    <div style="text-align:center; color:#666; font-size:13px; line-height:1.6;">
+                        <div style="margin-bottom:5px;">🌾 QQ农场计时器</div>
+                        <div style="margin-bottom:5px;">版本 1.4.0</div>
+                        <div>Made with ❤️ by <strong>noemi</strong></div>
+                        <div style="margin-top:5px; font-size:12px; color:#999;">© 2026 noemi. All rights reserved.</div>
+                    </div>
                 </div>
 
                 <button class="secondary-btn" onclick="toggleSettings()">关闭</button>
@@ -359,6 +369,15 @@
             <button class="toast-action" onclick="refreshApp()">刷新</button>
         </div>
         <button class="toast-close" onclick="dismissUpdateToast()">✕</button>
+    </div>
+
+    <!-- PWA 重新安装提示 -->
+    <div class="toast toast-update" id="pwa-reinstall-toast" style="display:none;">
+        <div class="toast-content">
+            <span class="toast-icon">🔄</span>
+            <span class="toast-message">PWA 已更新，建议重新安装以获得最佳体验</span>
+            <button class="toast-action" onclick="dismissPwaReinstallToast()">知道了</button>
+        </div>
     </div>
 
     <!-- 分析帮助弹窗 -->
@@ -510,6 +529,7 @@
                                     <p class="step-note">💡 <strong>操作提示</strong>：登录后页面会显示 SendKey（以 <code>SCT</code> 开头），点击复制按钮，然后粘贴到应用的"Server酱 SendKey"输入框中。</p>
                                 </div>
                                 <p class="step-warning">⚠️ <strong>重要</strong>：SendKey 相当于你的微信推送密码，不要分享给他人！</p>
+                                <p class="step-warning">⚠️ <strong>使用限制</strong>：Server酱免费版每天限推送5次，超过后当日将无法收到微信消息。建议仅在关键闹钟启用微信推送。</p>
                             </div>
                         </div>
                         <div class="step-item">
@@ -570,7 +590,11 @@
                         </div>
                         <div class="faq-item">
                             <div class="faq-question">Q: 为什么收不到微信推送？</div>
-                            <div class="faq-answer">A: 请检查：1）SendKey 是否正确；2）是否点击了"测试推送"并成功；3）GitHub Actions 是否正常运行（查看仓库的 Actions 标签页）。</div>
+                            <div class="faq-answer">A: 请检查：1）SendKey 是否正确；2）是否点击了"测试推送"并成功；3）GitHub Actions 是否正常运行（查看仓库的 Actions 标签页）；4）当日推送次数是否已达5次上限。</div>
+                        </div>
+                        <div class="faq-item">
+                            <div class="faq-question">Q: Server酱推送次数有限制吗？</div>
+                            <div class="faq-answer">A: 是的。Server酱免费版每天限推送5次，超过后当日将无法收到微信消息。建议仅在关键闹钟启用微信推送，或升级到付费版（SCT0）以解除限制。</div>
                         </div>
                         <div class="faq-item">
                             <div class="faq-question">Q: 多设备数据会冲突吗？</div>

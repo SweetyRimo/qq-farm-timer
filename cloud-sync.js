@@ -299,12 +299,15 @@ const CloudSync = {
             const gistId = await this.ensureGist();
             // 收集自定义植物数据
             const customPlants = Object.values(PLANTS_DATABASE).filter(p => p.isCustom);
+            const currentFarmLevel = parseInt(localStorage.getItem('farm-analysis-level')) || 1;
             const payload = {
                 alerts: alarms,
                 history: state.history.slice(-200),
                 customPlants: customPlants,
-                settings: state.settings
+                settings: state.settings,
+                farmLevel: currentFarmLevel
             };
+            console.log('[云同步] 推送农场等级:', currentFarmLevel);
             const data = {
                 files: {
                     [this.DATA_FILENAME]: {
@@ -336,6 +339,7 @@ const CloudSync = {
             if (dataFile) {
                 const content = dataFile.content;
                 const parsed = JSON.parse(content);
+                console.log('[云同步] 拉取到的数据:', { farmLevel: parsed.farmLevel });
                 // 新版返回 { alerts, history, customPlants, settings }，旧版返回纯数组
                 if (Array.isArray(parsed)) {
                     return { alerts: parsed, history: [], customPlants: [], settings: null };
@@ -344,7 +348,8 @@ const CloudSync = {
                     alerts: parsed.alerts || [],
                     history: parsed.history || [],
                     customPlants: parsed.customPlants || [],
-                    settings: parsed.settings || null
+                    settings: parsed.settings || null,
+                    farmLevel: parsed.farmLevel || 1
                 };
             }
             return { alerts: [], history: [], customPlants: [], settings: null };
@@ -529,6 +534,24 @@ const CloudSync = {
                 if (typeof refreshSettingsForm === 'function') {
                     refreshSettingsForm();
                 }
+            }
+
+            // 恢复农场等级
+            if (cloudData.farmLevel) {
+                const farmLevel = parseInt(cloudData.farmLevel) || 1;
+                localStorage.setItem('farm-analysis-level', farmLevel);
+                analysisState.farmLevel = farmLevel;
+                const farmLevelInput = document.getElementById('farm-level-input');
+                if (farmLevelInput) {
+                    farmLevelInput.value = farmLevel;
+                }
+                console.log('[云同步] 恢复农场等级:', farmLevel);
+                // 重新计算效率页面（使用新的农场等级）
+                if (typeof calculateEfficiency === 'function') {
+                    calculateEfficiency();
+                }
+            } else {
+                console.log('[云同步] 云端数据中无农场等级字段');
             }
 
             // 推送本地数据到云端（包含合并后的结果）
